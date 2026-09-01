@@ -76,10 +76,21 @@ RELEASE_CYCLER_URL ?= https://raw.githubusercontent.com/rankegraph/ranke-graph/$
 # exactly by the release job so a published handbook is one ranke-graph would have
 # built. check-tools and docs-pdf hold a local toolchain to the SERIES: typst is
 # pre-1.0, so the minor is what changes a layout and the patch is a bug fix.
+#
+# TYPST_VERSION now travels WITH the fetched papers ($(PAPERS_DIR)/TYPST_VERSION),
+# not a copy of our own: it names the Typst that renders THOSE documents, so a
+# pin decided and maintained here could drift from ranke-graph's — which is
+# exactly what happened before this. `=`, not `:=`: the file is fetched
+# infrastructure that need not exist yet when this Makefile is first read (a
+# fresh checkout, `make build`), so evaluation is deferred to whichever recipe
+# actually references it — by which point its prerequisite has fetched it.
+# "unknown" is a fallback for that same not-yet-fetched case, not a value
+# anything is released under: print-typst-version, the one consumer that runs
+# in a release, refuses it.
 TYPST         := typst
-TYPST_VERSION := 0.15.0
-TYPST_SERIES  := $(basename $(TYPST_VERSION))
-TYPST_URL     := https://github.com/typst/typst/releases/tag/v$(TYPST_VERSION)
+TYPST_VERSION  = $(shell cat $(PAPERS_DIR)/TYPST_VERSION 2>/dev/null || echo unknown)
+TYPST_SERIES   = $(basename $(TYPST_VERSION))
+TYPST_URL      = https://github.com/typst/typst/releases/tag/v$(TYPST_VERSION)
 
 # The oldest Node the generation tools run on, checked by check-tools rather than
 # only named in its install hint.
@@ -150,6 +161,9 @@ check-tools: ## Verify the toolchain is installed at the versions this repo pins
 	case "$$major" in ''|*[!0-9]*) major= ;; esac; \
 	if [ -n "$$major" ] && [ "$$major" -lt $(NODE_MIN) ]; then \
 		echo "  node $$(node -v), below the $(NODE_MIN)+ the generation tools need → https://nodejs.org"; exit 1; \
+	fi; \
+	if [ "$(TYPST_VERSION)" = "unknown" ]; then \
+		echo "ERROR: $(PAPERS_DIR)/TYPST_VERSION is not fetched yet, so there is nothing to check typst against — run 'make docs-current' first."; exit 1; \
 	fi; \
 	have=$$($(TYPST) --version 2>/dev/null | awk 'NR==1 {print $$2}'); have=$${have:-unknown}; \
 	if [ "$$(echo "$$have" | cut -d. -f1,2)" != "$(TYPST_SERIES)" ]; then \
@@ -399,9 +413,13 @@ $(RELEASE_CYCLER): ## Cache release-cycle.sh from ranke-graph (bin/ is gitignore
 	@curl -fsSL $(RELEASE_CYCLER_URL) -o $(RELEASE_CYCLER)
 	@chmod +x $(RELEASE_CYCLER)
 
-# Read by the release workflow, so bumping TYPST_VERSION here moves CI's install with it.
-print-typst-version:
-	@[ -n "$(TYPST_VERSION)" ] || { echo "TYPST_VERSION is empty — CI would install whatever typst is latest" >&2; exit 1; }
+# Read by the release workflow, so a TYPST_VERSION bump in ranke-graph moves CI's
+# install with it. docs-current first: the pin now lives in the fetched papers, not
+# a copy of our own, so this is where the fetch actually happens for a workflow that
+# reads the pin before it ever runs `make docs-pdf`.
+print-typst-version: docs-current
+	@[ -n "$(TYPST_VERSION)" ] && [ "$(TYPST_VERSION)" != "unknown" ] || \
+		{ echo "$(PAPERS_DIR)/TYPST_VERSION is missing or unreadable — CI would install whatever typst is latest" >&2; exit 1; }
 	@echo $(TYPST_VERSION)
 
 docs: docs-papers docs-pdf ## Pull the ranke-graph documents, then build this repo's handbook (dist/docs.pdf)
@@ -450,6 +468,8 @@ docs-bundle: docs-check ## Pack this repo's own chapters and REST contract into 
 	@tar -C $(DIST_DIR) -czf $(DOCS_BUNDLE) $(DOCS_BUNDLE_NAME)
 	@rm -rf $(DIST_DIR)/$(DOCS_BUNDLE_NAME)
 	@echo ">> wrote $(DOCS_BUNDLE) — $$(tar -tzf $(DOCS_BUNDLE) | grep -cv '/$$') file(s)"
+	@mkdir -p $(DIST_DIR)
+	@cp $(PAPERS_DIR)/TYPST_VERSION $(DIST_DIR)/TYPST_VERSION
 
 docs-clean: ## Remove the pulled paper references, the built handbook and the packed chapters
 	rm -rf $(PAPERS_DIR) $(DOCS_DIR)/vocabulary.typ $(DOCS_DIR)/handbook.typ $(DOCS_PDF) $(DOCS_BUNDLE)
