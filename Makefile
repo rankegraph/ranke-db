@@ -64,6 +64,14 @@ RANKE_FETCHER     := bin/fetch-ranke-docs.sh
 # documents.
 RANKE_FETCHER_URL ?= https://raw.githubusercontent.com/rankegraph/ranke-graph/$(RANKE_GRAPH_REF)/scripts/fetch-ranke-docs.sh
 
+# release-cycle.sh, same reasoning: the git mechanics of a release (branch
+# resolution, the merge-then-tag dance, the wait for CI) belong to ranke-graph
+# too, so this repo carries no fork of them. What differs here from another
+# consumer is nothing — no scripts/release-next-version.sh, -pretag.sh, or
+# -feature-branch-only — so this repo's release is exactly the shared cycle.
+RELEASE_CYCLER     := bin/release-cycle.sh
+RELEASE_CYCLER_URL ?= https://raw.githubusercontent.com/rankegraph/ranke-graph/$(RANKE_GRAPH_REF)/scripts/release-cycle.sh
+
 # The typst release ranke-graph's own release.yml builds its papers with, installed
 # exactly by the release job so a published handbook is one ranke-graph would have
 # built. check-tools and docs-pdf hold a local toolchain to the SERIES: typst is
@@ -284,11 +292,18 @@ check: verify ## Whole-repo quality gate: verify (Go), then frontend/'s own chec
 	@$(MAKE) -C frontend check
 	@$(MAKE) -C frontend test
 
+# $(RANKE_FETCHER)/$(RELEASE_CYCLER) are file targets with no prerequisite, so once
+# cached under bin/ they are never re-fetched on their own — a stale copy (missing a
+# ranke-graph fix, or a whole new document directory) would sit there forever
+# otherwise. upgrade is the one command that already means "bring everything to
+# latest", so refreshing them here is what makes that true rather than aspirational.
 upgrade: ## Upgrade all deps, tools and ranke-go to latest, tidy, then verify; asks before raising the go directive (GO_VERSION=keep|1.26.5, RANKE_GO_VERSION=vX.Y.Z)
 	@GO_VERSION=$(GO_VERSION) \
 		RANKE_GO_MOD=$(RANKE_GO_MOD) \
 		RANKE_GO_VERSION=$(RANKE_GO_VERSION) \
 		./scripts/upgrade.sh
+	@rm -f $(RANKE_FETCHER) $(RELEASE_CYCLER)
+	@$(MAKE) $(RANKE_FETCHER) $(RELEASE_CYCLER)
 
 ranke-ts-version: ## Recommend a ranke-ts bump if a newer release exists
 	-@[ -f $(FRONTEND_PKG) ] && { \
@@ -362,14 +377,14 @@ check-clean-tree:
 	@[ -z "$$(git status --porcelain)" ] || { echo "working tree is dirty — commit or stash before releasing" >&2; exit 1; }
 
 # Same reasoning as check-clean-tree: a missing or misspelled bump word is a free,
-# instant check, and release-gate is not — scripts/release.sh's own case statement
+# instant check, and release-gate is not — release-cycle.sh's own case statement
 # still validates it too, but only after release-gate already ran.
 check-release-bump:
 	@[ -n "$(filter major minor patch breaking feature fix,$(MAKECMDGOALS))" ] || \
 		{ echo "usage: make release <major|breaking | minor|feature | patch|fix>" >&2; exit 1; }
 
-release: check-clean-tree check-release-bump release-gate ## Release: clean → merge to default via PR → tag merged tip → push (bump: major|minor|patch, aliases breaking|feature|fix)
-	@./scripts/release.sh $(filter major minor patch breaking feature fix,$(MAKECMDGOALS))
+release: check-clean-tree check-release-bump release-gate $(RELEASE_CYCLER) ## Release: clean → merge to default via PR → tag merged tip → push (bump: major|minor|patch, aliases breaking|feature|fix)
+	@$(RELEASE_CYCLER) $(filter major minor patch breaking feature fix,$(MAKECMDGOALS))
 
 major minor patch breaking feature fix:
 	@:
@@ -378,6 +393,11 @@ $(RANKE_FETCHER): ## Cache fetch-ranke-docs.sh from ranke-graph (bin/ is gitigno
 	@mkdir -p $(dir $(RANKE_FETCHER))
 	@curl -fsSL $(RANKE_FETCHER_URL) -o $(RANKE_FETCHER)
 	@chmod +x $(RANKE_FETCHER)
+
+$(RELEASE_CYCLER): ## Cache release-cycle.sh from ranke-graph (bin/ is gitignored — infra, never vendored)
+	@mkdir -p $(dir $(RELEASE_CYCLER))
+	@curl -fsSL $(RELEASE_CYCLER_URL) -o $(RELEASE_CYCLER)
+	@chmod +x $(RELEASE_CYCLER)
 
 # Read by the release workflow, so bumping TYPST_VERSION here moves CI's install with it.
 print-typst-version:
