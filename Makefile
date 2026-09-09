@@ -30,6 +30,13 @@ RANKE_GO_MOD ?= github.com/rankegraph/ranke-go
 # would drag node_modules into `verify` and wire frontend/ into a build it stays out of.
 RANKE_TS_PKG ?= @rankegraph/ranke
 FRONTEND_PKG := frontend/package.json
+# The version the binary reports (/, /health, and the explorer's connection pane).
+# `git describe` names a release exactly and a build past one by its distance, so a
+# stamped binary never has to guess; internal/version falls back to its own build info
+# when nothing is injected (a bare `go build`, or `go install module@version`).
+VERSION   ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo unknown)
+LDFLAGS    = -X github.com/rankegraph/ranke-db/internal/version.injected=$(VERSION)
+
 RANKE_GO_VERSION ?= latest
 # ask = prompt before raising the go directive; keep = leave it; or a version.
 GO_VERSION ?= ask
@@ -197,7 +204,7 @@ tidy: ## Sync go.mod/go.sum with imports (adds transitive deps)
 
 build: ## Compile both binaries into bin/ (the server and the seeding client)
 	@echo ">> build → $(BIN)"
-	@go build -o $(BIN) ./cmd/ranke-db
+	@go build -ldflags "$(LDFLAGS)" -o $(BIN) ./cmd/ranke-db
 	@echo ">> build → $(GEN)"
 	@go build -o $(GEN) ./cmd/generator
 
@@ -234,7 +241,7 @@ SEED_ARGS = $(strip $(if $(filter big,$(SEED)), \
 dev: ## Run a dev server from DEV_CONFIG with /explorer active (SEED=example|release|chain|big to seed it once it answers)
 	@command -v openssl >/dev/null 2>&1 || { echo "ERROR: dev needs openssl to mint a throwaway signing key"; exit 1; }
 	@echo ">> build → $(BIN) (-tags explorer)"
-	@go build -tags explorer -o $(BIN) ./cmd/ranke-db
+	@go build -tags explorer -ldflags "$(LDFLAGS)" -o $(BIN) ./cmd/ranke-db
 	@echo ">> build → $(GEN)"
 	@go build -o $(GEN) ./cmd/generator
 	@addr=$$(grep -o '"addr"[[:space:]]*:[[:space:]]*"[^"]*"' $(DEV_CONFIG) | head -1 | sed -E 's/.*"([^"]*)"$$/\1/'); \
@@ -252,12 +259,15 @@ dev: ## Run a dev server from DEV_CONFIG with /explorer active (SEED=example|rel
 			fi; \
 		fi; \
 		mkdir -p -m 0700 run; \
-		echo ">> $(DEV_CONFIG) — ephemeral signing key, nothing persisted between runs"; \
+		echo ">> $(DEV_CONFIG) — ephemeral signing and founding keys, nothing persisted between runs"; \
 		echo ">> serving on  $$url"; \
 		echo ">> try:  curl $$url/health  ·  curl $$url/branches  ·  curl $$url/branches/main/head  ·  open $$url/explorer"; \
 		echo ">> ctrl-c to stop"; \
 		$(if $(SEED),$(GEN) $(SEED_ARGS) "$$url" --wait 15s &,) \
-		RANKE_SIGNER_KEY="$$(openssl genpkey -algorithm ed25519)" $(BIN) run --dev $(DEV_CONFIG)
+		founder_key=$$(openssl genpkey -algorithm ed25519); \
+		RANKE_SIGNER_KEY="$$(openssl genpkey -algorithm ed25519)" \
+		RANKE_FOUNDER_PUBKEY="$$(printf '%s' "$$founder_key" | openssl pkey -pubout)" \
+		$(BIN) run --dev $(DEV_CONFIG)
 
 # Seeding a server that is already up. An in-memory stack dies with its process, so
 # against the default config this only reaches an instance started by `make dev`.

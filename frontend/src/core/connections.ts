@@ -135,6 +135,8 @@ export interface ProbeResult {
   detail?: string;
   /** Whatever `/health` reported, verbatim. */
   body?: string;
+  /** The server build, as `/health` named it. Absent where the body did not parse. */
+  version?: string;
 }
 
 interface ConnectionsState {
@@ -298,6 +300,20 @@ export function apiFor(connection: Connection, secret: string): Api<unknown> {
 }
 
 /**
+ * versionOf reads the build a health body names. The body is handed back unparsed so a
+ * probe reports whatever answered, so this parses defensively: an instance too old to
+ * carry the field, or a proxy answering with something else entirely, leaves it absent.
+ */
+function versionOf(body: string): string | undefined {
+  try {
+    const parsed = JSON.parse(body) as { version?: unknown };
+    return typeof parsed.version === 'string' ? parsed.version : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * probe checks a connection by asking what the health route reports, which every instance
  * serves. It is the only request the explorer makes before the user asks for data, and it
  * reports what came back rather than interpreting it — hence the response format left unset,
@@ -307,10 +323,12 @@ export async function probe(connection: Connection, secret: string): Promise<Pro
   const t0 = performance.now();
   try {
     const answer = await apiFor(connection, secret).health.health({ format: undefined });
+    const body = await answer.text();
     return {
       state: 'ok',
       latencyMs: performance.now() - t0,
-      body: (await answer.text()).slice(0, 400),
+      body: body.slice(0, 400),
+      version: versionOf(body),
     };
   } catch (thrown) {
     const latencyMs = performance.now() - t0;

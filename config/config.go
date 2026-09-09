@@ -73,6 +73,9 @@ type App struct {
 	// DevClock is the launch's steerable clock, non-nil only when Run was called with
 	// dev true — the handle POST /dev/clock advances (-> core.WithDevClock).
 	DevClock *sequencer.SteerableClock
+	// Founded records the archive this launch brought into being, non-nil only when it
+	// founded one — so the launch log can carry the ids an operator must keep.
+	Founded *Founding
 	// The secret store is omitted on purpose: it lives in the section box, and nobody
 	// downstream holds it.
 }
@@ -120,7 +123,16 @@ func Run(ctx context.Context, cfg io.Reader, pass PassphraseSource, dev bool) (*
 	if err != nil {
 		return nil, err
 	}
-	return c.build(ctx, dev)
+	app, err := c.build(ctx, dev)
+	if err != nil {
+		return nil, err
+	}
+	// Founding is Run's, never build's: build is also what Verify(LevelConnect)
+	// assembles and discards, and a check has no business creating an archive.
+	if err := c.foundIfConfigured(ctx, app); err != nil {
+		return nil, err
+	}
+	return app, nil
 }
 
 // decode reads, decrypts (when encrypted), and parses the config — the shared
@@ -210,6 +222,13 @@ func (c *Config) build(ctx context.Context, dev bool) (*App, error) {
 
 	if len(c.Sequencer) > 0 {
 		sec := c.section(c.Sequencer)
+		// Checked here rather than in the storage port: a tree holding no bookmark
+		// store is only a fault for a deployment that runs a sequencer over it.
+		if app.Storage != nil {
+			if err := storage.CheckBookmarks(ctx, c.section(c.Storage), app.Storage); err != nil {
+				return nil, err
+			}
+		}
 		var now func() time.Time
 		if dev {
 			t, err := sec.Get(ctx, "type")

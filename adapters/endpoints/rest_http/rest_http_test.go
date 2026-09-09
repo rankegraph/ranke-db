@@ -113,10 +113,12 @@ func newServingStack(t *testing.T, grants []string) (http.Handler, ranke.Univers
 		t.Fatalf("signer.New: %v", err)
 	}
 	store := ranke.NewMemoryUniverse()
-	seq, err := sequencer.New(ctx, scope.Literal(map[string]string{"type": "dev"}), store, sig, nil)
+	seq, err := sequencer.New(ctx,
+		scope.Literal(map[string]string{"type": "dev", "seed": t.Name()}), store, sig, nil)
 	if err != nil {
 		t.Fatalf("sequencer.New: %v", err)
 	}
+	foundArchive(t, seq)
 	return newGrantedServer(t, grants, seq, store), store
 }
 
@@ -625,4 +627,23 @@ func waitForSocket(t *testing.T, path string) {
 		time.Sleep(5 * time.Millisecond)
 	}
 	t.Fatalf("socket %s never appeared", path)
+}
+
+// foundArchive brings the archive into being, which construction no longer does: a
+// Sequencer over an empty bookmark list reports InGenesis and refuses every other call
+// until Found succeeds. The founding key is a throwaway — these cases exercise the
+// endpoint, and nothing here contributes under it.
+func foundArchive(t *testing.T, seq sequencer.Sequencer) {
+	t.Helper()
+	pub, _, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatalf("generate founding key: %v", err)
+	}
+	encoded, err := ranke.EncodePublicKey(pub)
+	if err != nil {
+		t.Fatalf("encode founding key: %v", err)
+	}
+	if _, err := seq.Found(context.Background(), encoded); err != nil {
+		t.Fatalf("found the archive: %v", err)
+	}
 }

@@ -57,8 +57,8 @@ never passes silently.
 ]
 
 #item("sequencer")[
-  What advances the #gls("branch-table") head as contributions merge, and keeps
-  the history of previous heads. See @sec:sequencer.
+  What advances the #gls("branch-table") head as contributions merge, and
+  records each advance as a #gls("bookmark"). See @sec:sequencer.
 ]
 
 #item("signer")[

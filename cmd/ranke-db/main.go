@@ -3,24 +3,16 @@
 // job:     the ranke-db binary — a cobra CLI handing a config to the config package
 // limits:  CLI wiring only; decrypt/parse/resolve/assemble live in config (-> config)
 //
-// The binary opens the launch artifact, builds an age passphrase source from --age-key,
-// and hands both to config: "run" serves until signalled, "verify" checks and exits.
-// Everything past that handoff is config's.
+// One file per command; what sits here is the tree they hang off and the plumbing they
+// share — opening the launch artifact, and sourcing the age key that decrypts it.
 package main
 
 import (
-	"context"
-	"crypto/ed25519"
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
-	"log/slog"
 	"os"
-	"os/signal"
 	"strings"
-	"sync"
-	"syscall"
 
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
@@ -44,75 +36,8 @@ func rootCmd() *cobra.Command {
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
-	root.AddCommand(runCmd(), verifyCmd())
+	root.AddCommand(runCmd(), verifyCmd(), foundCmd())
 	return root
-}
-
-// runCmd assembles the stack from a config and serves it.
-func runCmd() *cobra.Command {
-	var ageKey string
-	var dev bool
-	c := &cobra.Command{
-		Use:   "run [flags] <configfile>|-",
-		Short: "Assemble the adapter stack from a config and serve it",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg, cleanup, err := openConfig(args[0], ageKey)
-			if err != nil {
-				return err
-			}
-			defer cleanup()
-			src, err := passphraseFrom(ageKey, os.Stdin)
-			if err != nil {
-				return err
-			}
-			app, err := config.Run(cmd.Context(), cfg, src, dev)
-			if err != nil {
-				return err
-			}
-			if err := requireServing(app); err != nil {
-				return err
-			}
-			return serve(app)
-		},
-	}
-	c.Flags().StringVar(&ageKey, "age-key", "", "age key source: prompt|stdin|env:VAR|file:path")
-	c.Flags().BoolVar(&dev, "dev", false,
-		"mount POST /dev/clock, steering the sequencer's clock instead of real time — requires sequencer.type \"dev\"; never for a real deployment")
-	return c
-}
-
-// verifyCmd checks a config to the chosen depth and reports, without serving.
-func verifyCmd() *cobra.Command {
-	var ageKey, levelName string
-	c := &cobra.Command{
-		Use:   "verify [flags] <configfile>|-",
-		Short: "Check a config to a chosen depth (syntax|resolve)",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			level, err := parseLevel(levelName)
-			if err != nil {
-				return err
-			}
-			cfg, cleanup, err := openConfig(args[0], ageKey)
-			if err != nil {
-				return err
-			}
-			defer cleanup()
-			src, err := passphraseFrom(ageKey, os.Stdin)
-			if err != nil {
-				return err
-			}
-			if err := config.Verify(cmd.Context(), cfg, src, level); err != nil {
-				return err
-			}
-			fmt.Fprintln(cmd.OutOrStdout(), "config ok")
-			return nil
-		},
-	}
-	c.Flags().StringVar(&ageKey, "age-key", "", "age key source: prompt|stdin|env:VAR|file:path")
-	c.Flags().StringVar(&levelName, "level", "syntax", "verify depth: syntax|resolve|connect")
-	return c
 }
 
 // openConfig opens the launch artifact as a reader: a file (closed by cleanup)
@@ -129,20 +54,6 @@ func openConfig(path, ageKey string) (io.Reader, func(), error) {
 		return nil, nil, fmt.Errorf("open config: %w", err)
 	}
 	return f, func() { _ = f.Close() }, nil
-}
-
-// parseLevel maps the --level flag to a config.Level.
-func parseLevel(s string) (config.Level, error) {
-	switch s {
-	case "syntax", "":
-		return config.LevelSyntax, nil
-	case "resolve":
-		return config.LevelResolve, nil
-	case "connect":
-		return config.LevelConnect, nil
-	default:
-		return 0, fmt.Errorf("unknown --level %q (want syntax|resolve|connect)", s)
-	}
 }
 
 // passphraseFrom builds a config.PassphraseSource from a spec: prompt, stdin,
@@ -200,80 +111,4 @@ func promptPassphrase() (string, error) {
 		return "", fmt.Errorf("read passphrase: %w", err)
 	}
 	return string(b), nil
-}
-
-// requireServing enforces what serving cannot do without: a signer, storage, a
-// sequencer to reach the archive through, and an endpoint to reach them. Run assembles
-// only what is configured; the policy lives here.
-func requireServing(app *config.App) error {
-	var missing []string
-	if app.Signer == nil {
-		missing = append(missing, "signer")
-	}
-	if app.Storage == nil {
-		missing = append(missing, "storage")
-	}
-	if app.Sequencer == nil {
-		// GetArchive is the sequencer's, and an archive is what every read opens, so a
-		// stack without one answers nothing.
-		missing = append(missing, "sequencer")
-	}
-	if len(app.Endpoints) == 0 {
-		missing = append(missing, "endpoints")
-	}
-	if len(missing) > 0 {
-		return fmt.Errorf("config is missing required section(s) for serving: %v", missing)
-	}
-	return nil
-}
-
-// serve runs every endpoint the config mounted, concurrently, until the process is
-// signalled. Each listens where its own section says: no flag can disagree.
-func serve(app *config.App) error {
-	logIdentity(app)
-
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer stop()
-
-	sctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	errc := make(chan error, len(app.Endpoints))
-	var wg sync.WaitGroup
-	for _, ep := range app.Endpoints {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			errc <- ep.Serve(sctx)
-		}()
-	}
-	slog.Info("ranke-db serving", "endpoints", len(app.Endpoints))
-
-	// The first endpoint to fail takes the process down: a stack serving less than
-	// configured is not the stack the operator asked for.
-	select {
-	case err := <-errc:
-		cancel()
-		wg.Wait()
-		return err
-	case <-ctx.Done():
-		slog.Info("ranke-db shutting down")
-		cancel()
-		wg.Wait()
-		return nil
-	}
-}
-
-// logIdentity reports which key the server attests merges under.
-func logIdentity(app *config.App) {
-	pub, err := app.Signer.Public(context.Background())
-	if err != nil {
-		slog.Warn("ranke-db: could not read signer identity", "err", err)
-		return
-	}
-	id := fmt.Sprintf("%T", pub)
-	if ed, ok := pub.(ed25519.PublicKey); ok {
-		id = "ed25519:" + base64.RawStdEncoding.EncodeToString(ed)
-	}
-	slog.Info("ranke-db assembled", "signer", id)
 }

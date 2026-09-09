@@ -1,13 +1,14 @@
 // package: rest_http / transport
 // type:    adapter
-// job:     serves explorer.html when the `explorer` build tag embedded it (-> frontend)
-// limits:  a static asset route, no API surface — not part of the OpenAPI contract
+// job:     the two routes outside the API — explorer.html, and the root naming this build
+// limits:  static responses, no API surface — neither is part of the OpenAPI contract
 package rest_http
 
 import (
 	"net/http"
 
 	"github.com/rankegraph/ranke-db/frontend"
+	"github.com/rankegraph/ranke-db/internal/version"
 )
 
 // explorerHandler serves the embedded explorer.html when enabled allows it, 404
@@ -26,5 +27,16 @@ func explorerHandler(enabled bool) http.HandlerFunc {
 		}
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		_, _ = w.Write(b)
+	}
+}
+
+// rootHandler names the build at "/". The generated router owns "/" as a catch-all, so
+// this is registered on "/{$}", which matches the root alone and leaves every unrouted
+// path its 404 — a gap in the paths, not an answer the contract owes.
+func rootHandler() http.HandlerFunc {
+	body := "ranke-db " + version.String() + "\n"
+	return func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		_, _ = w.Write([]byte(body))
 	}
 }

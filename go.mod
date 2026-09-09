@@ -12,7 +12,7 @@ require (
 	github.com/neo4j/neo4j-go-driver/v5 v5.28.4
 	github.com/oapi-codegen/runtime v1.7.0
 	github.com/openbao/openbao/api/v2 v2.6.0
-	github.com/rankegraph/ranke-go v0.27.0
+	github.com/rankegraph/ranke-go v0.29.0
 	github.com/redis/go-redis/v9 v9.22.0
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.12.1

@@ -13,9 +13,8 @@
   },
   "sequencer": {
     "type": "dev",
-    "history": {
-      "type": "mem"
-    }
+    "seed": "minimal-example",
+    "founder": "env(RANKE_FOUNDER_PUBKEY)"
   },
   "accounts": {
     "ops": {

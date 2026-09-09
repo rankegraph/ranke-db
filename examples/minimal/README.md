@@ -47,8 +47,8 @@ testing a client against.
 
 Seeding with `make dev` rather than in a second run matters here: this stack keeps
 nothing on disk, so an archive only exists while the process serving it is up. Against
-a persistent storage and history, seed once with `make seed` and relaunch as often as
-you like.
+a persistent storage, seed once with `make seed` and relaunch as often as you like —
+a restart reopens the archive its bookmark list records.
 
 The fixture identity is derived from its name (`--as`, default `dev`) and the clock is
 pinned, so the same command always produces the same claim ids — re-seeding merges
@@ -107,9 +107,27 @@ is behind a socket rather than a port.
 
 ### The sequencer section
 
-`"sequencer": {"type": "dev", "history": {"type": "mem"}}` binds ranke-go's serial
-reference writer with an in-memory head timeline — right for a dev server that
-persists nothing. `"concurrent"` selects the writer that prepares contributions in parallel and
-folds a batch into one head advance, and
-`"history": {"type": "file", "path": "..."}` persists the head timeline, which is
-what lets a restart reopen an archive rather than bootstrap a fresh one.
+`"type": "dev"` binds ranke-go's serial reference writer, one contribution at a time —
+right for a dev server. `"concurrent"` selects the writer that prepares contributions
+in parallel and folds a batch into one head advance.
+
+`"seed"` names the bookmark list this instance advances. A bookmark records a head id
+in 𝒰_hist, which the storage beneath holds, so the list inherits that storage's
+layering and replication. The seed is a **name, not a secret**: the same seed reaches
+the same bookmarks, a different one starts a different list. Its entropy only keeps
+lists nobody coordinated apart, so a distinctive label serves whenever you own the
+store. Use `"bookmark": "<id>"` instead to reopen a list whose earliest entries were
+lost — any surviving entry carries the seed the whole list shares.
+
+`"founder"` is the PEM **public** key of the archive's first contributor. An archive
+comes into being once, and this is what a launch founds it under; the private half
+stays with whatever application contributes under that identity. Leave `founder` out
+and the launch refuses to serve an archive that does not exist yet, naming what is
+missing — found it by hand instead:
+
+```sh
+ranke-db found examples/minimal/config.json first-contributor.pub.pem
+```
+
+which reports the first contributor, the head and a bookmark, then exits. Record the
+bookmark: with the seed lost, it is the only way back to the archive.

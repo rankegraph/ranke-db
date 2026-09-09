@@ -932,6 +932,7 @@ core-access decision, not part of this contract.
 ```json
 {
   "status": "ok",
+  "version": "v1.19.2",
   "signer": "did:key:z6Mk..."
 }
 ```
@@ -1762,6 +1763,7 @@ and what it already held.
 ```json
 {
   "status": "ok",
+  "version": "v1.19.2",
   "signer": "did:key:z6Mk..."
 }
 
@@ -1772,6 +1774,7 @@ and what it already held.
 |Name|Type|Required|Restrictions|Description|
 |---|---|---|---|---|
 |status|string|true|none|none|
+|version|string|true|none|The server build answering this request. A release names itself exactly;<br>a build from a checkout names its revision, marked when the tree carried<br>uncommitted changes.|
 |signer|string|false|none|The contributor identity this stack signs merges with.|
 
 <h2 id="tocS_StorageLayer">StorageLayer</h2>

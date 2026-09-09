@@ -169,6 +169,13 @@ export interface Health {
   /** @example "ok" */
   status: string;
   /**
+   * The server build answering this request. A release names itself exactly;
+   * a build from a checkout names its revision, marked when the tree carried
+   * uncommitted changes.
+   * @example "v1.19.2"
+   */
+  version: string;
+  /**
    * The contributor identity this stack signs merges with.
    * @example "did:key:z6Mk..."
    */

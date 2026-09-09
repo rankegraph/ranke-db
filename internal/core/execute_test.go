@@ -45,10 +45,12 @@ func newStack(t *testing.T) *Core {
 	}
 
 	store := ranke.NewMemoryUniverse()
-	seq, err := sequencer.New(ctx, scope.Literal(map[string]string{"type": "dev"}), store, sig, nil)
+	seq, err := sequencer.New(ctx,
+		scope.Literal(map[string]string{"type": "dev", "seed": t.Name()}), store, sig, nil)
 	if err != nil {
 		t.Fatalf("sequencer.New: %v", err)
 	}
+	foundArchive(t, seq)
 
 	return newCoreFor(t, seq, store, WithSigner(sig),
 		WithLayers([]StorageLayer{{Name: "hot", Type: "mem"}, {Name: "cold", Type: "fs"}}))
@@ -371,3 +373,21 @@ func mustField(t *testing.T, body []byte, name string) []byte {
 
 // discard keeps io imported for the stream contract's WriterTo use above.
 var _ io.Writer = io.Discard
+
+// foundArchive brings the archive into being, which construction no longer does: a
+// Sequencer over an empty bookmark list reports InGenesis and refuses every other call
+// until Found succeeds.
+func foundArchive(t *testing.T, seq sequencer.Sequencer) {
+	t.Helper()
+	pub, _, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatalf("generate founding key: %v", err)
+	}
+	encoded, err := ranke.EncodePublicKey(pub)
+	if err != nil {
+		t.Fatalf("encode founding key: %v", err)
+	}
+	if _, err := seq.Found(context.Background(), encoded); err != nil {
+		t.Fatalf("found the archive: %v", err)
+	}
+}
