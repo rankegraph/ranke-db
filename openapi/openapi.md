@@ -2208,7 +2208,7 @@ null
 
 ```
 
-A value a comparison tests against. How two values compare is the engine's, so the shape is unconstrained here.
+A value a comparison tests against. Where it tests a time it MUST be a V-TIME timestamp or an EDTF Level 1 value, and anything else is rejected rather than coerced (R-QTIMEOP); otherwise how two values compare is the engine's.
 
 ### Properties
 
@@ -2234,12 +2234,12 @@ One operator applied to one field. eq, ne, lt, le, gt and ge take a value, in a 
 
 |Name|Type|Required|Restrictions|Description|
 |---|---|---|---|---|
-|eq|[Value](#schemavalue)|false|none|A value a comparison tests against. How two values compare is the engine's, so the shape is unconstrained here.|
-|ne|[Value](#schemavalue)|false|none|A value a comparison tests against. How two values compare is the engine's, so the shape is unconstrained here.|
-|lt|[Value](#schemavalue)|false|none|A value a comparison tests against. How two values compare is the engine's, so the shape is unconstrained here.|
-|le|[Value](#schemavalue)|false|none|A value a comparison tests against. How two values compare is the engine's, so the shape is unconstrained here.|
-|gt|[Value](#schemavalue)|false|none|A value a comparison tests against. How two values compare is the engine's, so the shape is unconstrained here.|
-|ge|[Value](#schemavalue)|false|none|A value a comparison tests against. How two values compare is the engine's, so the shape is unconstrained here.|
+|eq|[Value](#schemavalue)|false|none|A value a comparison tests against. Where it tests a time it MUST be a V-TIME timestamp or an EDTF Level 1 value, and anything else is rejected rather than coerced (R-QTIMEOP); otherwise how two values compare is the engine's.|
+|ne|[Value](#schemavalue)|false|none|A value a comparison tests against. Where it tests a time it MUST be a V-TIME timestamp or an EDTF Level 1 value, and anything else is rejected rather than coerced (R-QTIMEOP); otherwise how two values compare is the engine's.|
+|lt|[Value](#schemavalue)|false|none|A value a comparison tests against. Where it tests a time it MUST be a V-TIME timestamp or an EDTF Level 1 value, and anything else is rejected rather than coerced (R-QTIMEOP); otherwise how two values compare is the engine's.|
+|le|[Value](#schemavalue)|false|none|A value a comparison tests against. Where it tests a time it MUST be a V-TIME timestamp or an EDTF Level 1 value, and anything else is rejected rather than coerced (R-QTIMEOP); otherwise how two values compare is the engine's.|
+|gt|[Value](#schemavalue)|false|none|A value a comparison tests against. Where it tests a time it MUST be a V-TIME timestamp or an EDTF Level 1 value, and anything else is rejected rather than coerced (R-QTIMEOP); otherwise how two values compare is the engine's.|
+|ge|[Value](#schemavalue)|false|none|A value a comparison tests against. Where it tests a time it MUST be a V-TIME timestamp or an EDTF Level 1 value, and anything else is rejected rather than coerced (R-QTIMEOP); otherwise how two values compare is the engine's.|
 |in|[[Value](#schemavalue)]|false|none|Set membership.|
 |glob|string|false|none|Shell-style wildcard.|
 

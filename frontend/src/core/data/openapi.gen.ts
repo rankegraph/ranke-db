@@ -359,22 +359,22 @@ export type Where =
       test: Comparison;
     };
 
-/** A value a comparison tests against. How two values compare is the engine's, so the shape is unconstrained here. */
+/** A value a comparison tests against. Where it tests a time it MUST be a V-TIME timestamp or an EDTF Level 1 value, and anything else is rejected rather than coerced (R-QTIMEOP); otherwise how two values compare is the engine's. */
 export type Value = any;
 
 /** One operator applied to one field. eq, ne, lt, le, gt and ge take a value, in a set, glob a shell-style wildcard. Exactly one is present. */
 export interface Comparison {
-  /** A value a comparison tests against. How two values compare is the engine's, so the shape is unconstrained here. */
+  /** A value a comparison tests against. Where it tests a time it MUST be a V-TIME timestamp or an EDTF Level 1 value, and anything else is rejected rather than coerced (R-QTIMEOP); otherwise how two values compare is the engine's. */
   eq?: Value;
-  /** A value a comparison tests against. How two values compare is the engine's, so the shape is unconstrained here. */
+  /** A value a comparison tests against. Where it tests a time it MUST be a V-TIME timestamp or an EDTF Level 1 value, and anything else is rejected rather than coerced (R-QTIMEOP); otherwise how two values compare is the engine's. */
   ne?: Value;
-  /** A value a comparison tests against. How two values compare is the engine's, so the shape is unconstrained here. */
+  /** A value a comparison tests against. Where it tests a time it MUST be a V-TIME timestamp or an EDTF Level 1 value, and anything else is rejected rather than coerced (R-QTIMEOP); otherwise how two values compare is the engine's. */
   lt?: Value;
-  /** A value a comparison tests against. How two values compare is the engine's, so the shape is unconstrained here. */
+  /** A value a comparison tests against. Where it tests a time it MUST be a V-TIME timestamp or an EDTF Level 1 value, and anything else is rejected rather than coerced (R-QTIMEOP); otherwise how two values compare is the engine's. */
   le?: Value;
-  /** A value a comparison tests against. How two values compare is the engine's, so the shape is unconstrained here. */
+  /** A value a comparison tests against. Where it tests a time it MUST be a V-TIME timestamp or an EDTF Level 1 value, and anything else is rejected rather than coerced (R-QTIMEOP); otherwise how two values compare is the engine's. */
   gt?: Value;
-  /** A value a comparison tests against. How two values compare is the engine's, so the shape is unconstrained here. */
+  /** A value a comparison tests against. Where it tests a time it MUST be a V-TIME timestamp or an EDTF Level 1 value, and anything else is rejected rather than coerced (R-QTIMEOP); otherwise how two values compare is the engine's. */
   ge?: Value;
   /** Set membership. */
   in?: Value[];
