@@ -4,6 +4,8 @@ What each release changed for someone depending on this repository.
 
 ## Unreleased
 
+## v1.20.1 — 2026-09-09
+
 ### Fixed
 
 - The release workflow reads the typst pin again. `make print-typst-version` ran the
