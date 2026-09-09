@@ -20,6 +20,7 @@ import (
 
 	"github.com/rankegraph/ranke-db/adapters/signer"
 	"github.com/rankegraph/ranke-db/internal/core/access"
+	"github.com/rankegraph/ranke-db/internal/version"
 )
 
 // execute runs the operation against the ports and returns its response stream.
@@ -254,7 +255,7 @@ func (c *Core) branch(ctx context.Context, req *Request, archive ranke.Archive) 
 // health reports liveness and the signing identity, taken from the signer so it answers
 // when no archive opened.
 func (c *Core) health(ctx context.Context, req *Request) (Stream, error) {
-	report := Health{Status: "ok"}
+	report := Health{Status: "ok", Version: version.String()}
 	if c.signer != nil {
 		report.Signer = signer.Identity(ctx, c.signer)
 	}
@@ -335,6 +336,17 @@ func mapLibError(err error) error {
 		return fmt.Errorf("%w: %v", ErrNotFound, err)
 	case errors.Is(err, ranke.ErrUnsupported):
 		return fmt.Errorf("%w: %v", ErrNotImplemented, err)
+	case errors.Is(err, ranke.ErrQueryTimeOperand):
+		// A time field takes one spelling (`R-QTIMEOP`): a `V-TIME` timestamp, or an
+		// EDTF Level 1 value on `dated`. A loosely written bound used to be compared as
+		// text against the stored fixed-width form and named the wrong instant, so this
+		// is the caller's query to correct.
+		return fmt.Errorf("%w: %v", ErrInvalidRequest, err)
+	case errors.Is(err, ranke.ErrSequencerGenesis):
+		// The server stands, holding no archive to answer from. A launch refuses this
+		// state outright, so reaching it means founding happened elsewhere — retry once
+		// it has.
+		return fmt.Errorf("%w: %v", ErrBusy, err)
 	case errors.Is(err, ranke.ErrBranchNotCreatable),
 		errors.Is(err, ranke.ErrUnreadableReference),
 		errors.Is(err, ranke.ErrReservedType):

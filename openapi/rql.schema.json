@@ -304,7 +304,7 @@
     },
 
     "Value": {
-      "description": "A value a comparison tests against. How two values compare is the engine's, so the shape is unconstrained here."
+      "description": "A value a comparison tests against. Where it tests a time it MUST be a V-TIME timestamp or an EDTF Level 1 value, and anything else is rejected rather than coerced (R-QTIMEOP); otherwise how two values compare is the engine's."
     }
   },
 

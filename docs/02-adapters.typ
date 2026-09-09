@@ -128,26 +128,77 @@ stood.
   `--dev` requires.
 ]
 
-#item("history")[
-  An object naming where the head timeline is kept. `{"type": "mem"}` keeps it
-  in memory, and is the default when the field is absent; `{"type": "file",
-  "path": "..."}` keeps it in a file.
+#item("seed")[
+  Names the #gls("bookmark") list this instance advances. The same seed reaches
+  the same bookmarks; a different seed starts a different list. Exclusive with
+  `bookmark`, and one of the two is required.
 ]
 
-The history choice decides whether a restart reopens the existing archive or
-bootstraps an empty one, so a deployment that keeps its storage on disk wants
-its history there too.
+#item("bookmark")[
+  The id of one #gls("bookmark"), naming its list the other way about: the
+  record there carries the #gls("bookmark-seed") every entry in the list holds.
+  This is the way back in when the earliest entries were lost. Exclusive with
+  `seed`, and one of the two is required.
+]
+
+#item("founder")[
+  The PEM public key of the archive's first #gls("contributor"), under which a
+  launch founds an archive that does not exist yet. Optional: leaving it out
+  means founding by hand instead.
+]
+
+A seed is a name, not a secret. Its entropy keeps lists that nobody coordinated
+apart, which is why `V-BMENV` states 128 bits as a SHOULD, so a distinctive
+label serves wherever you own the store.
+
+The #gls("bookmark-store") is the #gls("universe")'s own, so the list inherits
+the layering, replication and backup of the storage beneath it. A layer that is
+a rebuildable projection holds none, the head being lost with the reindex; a
+stack holds them when one of its authoritative layers does, and a partition
+replicates the list to every shard, so it needs all of them to.
+
+#warning[
+  Losing the seed and every bookmark id together loses the archive: a
+  #gls("bookmark-store") is how a moving head is found at all, so the claims
+  stay intact in the #gls("universe") with nothing left pointing at them. Keep
+  the bookmark id a launch reports.
+]
 
 #example[
 #listing[
 ```json
 "sequencer": {
   "type": "concurrent",
-  "history": {"type": "file", "path": "/var/lib/rankedb/head.log"}
+  "seed": "production-archive",
+  "founder": "env(RANKE_FOUNDER_PUBKEY)"
 }
 ```
 ]
 ]
+
+=== Founding an archive <sec:founding>
+
+An archive comes into being once. A sequencer whose #gls("bookmark") list is
+empty holds no archive yet and refuses every read and every write until one is
+founded, which writes the sequencer's own initial claim, the first
+#gls("contributor") under it, the empty #gls("branch-table") and its first
+bookmark.
+
+A launch resolves that state before it serves. With `founder` set it founds and
+carries on, reporting the first contributor, the head and the bookmark in its
+log. Without it the launch refuses, naming what is missing, rather than serving
+an archive that is not there.
+
+#listing[
+```sh
+ranke-db found config.json first-contributor.pub.pem
+```
+]
+
+The command founds and exits, reporting the same three ids. An archive that
+already exists is reported as such and left alone, so provisioning may call it
+ahead of every launch. Only the public half of the founding key is ever given
+to the server: whatever contributes under that identity keeps the rest.
 
 == `signer` — the identity merges are attested with <sec:signer>
 

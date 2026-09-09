@@ -1041,11 +1041,18 @@ components:
 
     Health:
       type: object
-      required: [status]
+      required: [status, version]
       properties:
         status:
           type: string
           example: ok
+        version:
+          type: string
+          description: |
+            The server build answering this request. A release names itself exactly;
+            a build from a checkout names its revision, marked when the tree carried
+            uncommitted changes.
+          example: v1.19.2
         signer:
           type: string
           description: The contributor identity this stack signs merges with.

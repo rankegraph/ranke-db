@@ -932,6 +932,7 @@ core-access decision, not part of this contract.
 ```json
 {
   "status": "ok",
+  "version": "v1.19.2",
   "signer": "did:key:z6Mk..."
 }
 ```
@@ -1762,6 +1763,7 @@ and what it already held.
 ```json
 {
   "status": "ok",
+  "version": "v1.19.2",
   "signer": "did:key:z6Mk..."
 }
 
@@ -1772,6 +1774,7 @@ and what it already held.
 |Name|Type|Required|Restrictions|Description|
 |---|---|---|---|---|
 |status|string|true|none|none|
+|version|string|true|none|The server build answering this request. A release names itself exactly;<br>a build from a checkout names its revision, marked when the tree carried<br>uncommitted changes.|
 |signer|string|false|none|The contributor identity this stack signs merges with.|
 
 <h2 id="tocS_StorageLayer">StorageLayer</h2>
@@ -2205,7 +2208,7 @@ null
 
 ```
 
-A value a comparison tests against. How two values compare is the engine's, so the shape is unconstrained here.
+A value a comparison tests against. Where it tests a time it MUST be a V-TIME timestamp or an EDTF Level 1 value, and anything else is rejected rather than coerced (R-QTIMEOP); otherwise how two values compare is the engine's.
 
 ### Properties
 
@@ -2231,12 +2234,12 @@ One operator applied to one field. eq, ne, lt, le, gt and ge take a value, in a 
 
 |Name|Type|Required|Restrictions|Description|
 |---|---|---|---|---|
-|eq|[Value](#schemavalue)|false|none|A value a comparison tests against. How two values compare is the engine's, so the shape is unconstrained here.|
-|ne|[Value](#schemavalue)|false|none|A value a comparison tests against. How two values compare is the engine's, so the shape is unconstrained here.|
-|lt|[Value](#schemavalue)|false|none|A value a comparison tests against. How two values compare is the engine's, so the shape is unconstrained here.|
-|le|[Value](#schemavalue)|false|none|A value a comparison tests against. How two values compare is the engine's, so the shape is unconstrained here.|
-|gt|[Value](#schemavalue)|false|none|A value a comparison tests against. How two values compare is the engine's, so the shape is unconstrained here.|
-|ge|[Value](#schemavalue)|false|none|A value a comparison tests against. How two values compare is the engine's, so the shape is unconstrained here.|
+|eq|[Value](#schemavalue)|false|none|A value a comparison tests against. Where it tests a time it MUST be a V-TIME timestamp or an EDTF Level 1 value, and anything else is rejected rather than coerced (R-QTIMEOP); otherwise how two values compare is the engine's.|
+|ne|[Value](#schemavalue)|false|none|A value a comparison tests against. Where it tests a time it MUST be a V-TIME timestamp or an EDTF Level 1 value, and anything else is rejected rather than coerced (R-QTIMEOP); otherwise how two values compare is the engine's.|
+|lt|[Value](#schemavalue)|false|none|A value a comparison tests against. Where it tests a time it MUST be a V-TIME timestamp or an EDTF Level 1 value, and anything else is rejected rather than coerced (R-QTIMEOP); otherwise how two values compare is the engine's.|
+|le|[Value](#schemavalue)|false|none|A value a comparison tests against. Where it tests a time it MUST be a V-TIME timestamp or an EDTF Level 1 value, and anything else is rejected rather than coerced (R-QTIMEOP); otherwise how two values compare is the engine's.|
+|gt|[Value](#schemavalue)|false|none|A value a comparison tests against. Where it tests a time it MUST be a V-TIME timestamp or an EDTF Level 1 value, and anything else is rejected rather than coerced (R-QTIMEOP); otherwise how two values compare is the engine's.|
+|ge|[Value](#schemavalue)|false|none|A value a comparison tests against. Where it tests a time it MUST be a V-TIME timestamp or an EDTF Level 1 value, and anything else is rejected rather than coerced (R-QTIMEOP); otherwise how two values compare is the engine's.|
 |in|[[Value](#schemavalue)]|false|none|Set membership.|
 |glob|string|false|none|Shell-style wildcard.|
 

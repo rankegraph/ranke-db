@@ -30,6 +30,13 @@ RANKE_GO_MOD ?= github.com/rankegraph/ranke-go
 # would drag node_modules into `verify` and wire frontend/ into a build it stays out of.
 RANKE_TS_PKG ?= @rankegraph/ranke
 FRONTEND_PKG := frontend/package.json
+# The version the binary reports (/, /health, and the explorer's connection pane).
+# `git describe` names a release exactly and a build past one by its distance, so a
+# stamped binary never has to guess; internal/version falls back to its own build info
+# when nothing is injected (a bare `go build`, or `go install module@version`).
+VERSION   ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo unknown)
+LDFLAGS    = -X github.com/rankegraph/ranke-db/internal/version.injected=$(VERSION)
+
 RANKE_GO_VERSION ?= latest
 # ask = prompt before raising the go directive; keep = leave it; or a version.
 GO_VERSION ?= ask
@@ -64,14 +71,33 @@ RANKE_FETCHER     := bin/fetch-ranke-docs.sh
 # documents.
 RANKE_FETCHER_URL ?= https://raw.githubusercontent.com/rankegraph/ranke-graph/$(RANKE_GRAPH_REF)/scripts/fetch-ranke-docs.sh
 
+# release-cycle.sh, same reasoning: the git mechanics of a release (branch
+# resolution, the merge-then-tag dance, the wait for CI) belong to ranke-graph
+# too, so this repo carries no fork of them. What differs here from another
+# consumer is nothing — no scripts/release-next-version.sh, -pretag.sh, or
+# -feature-branch-only — so this repo's release is exactly the shared cycle.
+RELEASE_CYCLER     := bin/release-cycle.sh
+RELEASE_CYCLER_URL ?= https://raw.githubusercontent.com/rankegraph/ranke-graph/$(RANKE_GRAPH_REF)/scripts/release-cycle.sh
+
 # The typst release ranke-graph's own release.yml builds its papers with, installed
 # exactly by the release job so a published handbook is one ranke-graph would have
 # built. check-tools and docs-pdf hold a local toolchain to the SERIES: typst is
 # pre-1.0, so the minor is what changes a layout and the patch is a bug fix.
+#
+# TYPST_VERSION now travels WITH the fetched papers ($(PAPERS_DIR)/TYPST_VERSION),
+# not a copy of our own: it names the Typst that renders THOSE documents, so a
+# pin decided and maintained here could drift from ranke-graph's — which is
+# exactly what happened before this. `=`, not `:=`: the file is fetched
+# infrastructure that need not exist yet when this Makefile is first read (a
+# fresh checkout, `make build`), so evaluation is deferred to whichever recipe
+# actually references it — by which point its prerequisite has fetched it.
+# "unknown" is a fallback for that same not-yet-fetched case, not a value
+# anything is released under: print-typst-version, the one consumer that runs
+# in a release, refuses it.
 TYPST         := typst
-TYPST_VERSION := 0.15.0
-TYPST_SERIES  := $(basename $(TYPST_VERSION))
-TYPST_URL     := https://github.com/typst/typst/releases/tag/v$(TYPST_VERSION)
+TYPST_VERSION  = $(shell cat $(PAPERS_DIR)/TYPST_VERSION 2>/dev/null || echo unknown)
+TYPST_SERIES   = $(basename $(TYPST_VERSION))
+TYPST_URL      = https://github.com/typst/typst/releases/tag/v$(TYPST_VERSION)
 
 # The oldest Node the generation tools run on, checked by check-tools rather than
 # only named in its install hint.
@@ -143,6 +169,9 @@ check-tools: ## Verify the toolchain is installed at the versions this repo pins
 	if [ -n "$$major" ] && [ "$$major" -lt $(NODE_MIN) ]; then \
 		echo "  node $$(node -v), below the $(NODE_MIN)+ the generation tools need → https://nodejs.org"; exit 1; \
 	fi; \
+	if [ "$(TYPST_VERSION)" = "unknown" ]; then \
+		echo "ERROR: $(PAPERS_DIR)/TYPST_VERSION is not fetched yet, so there is nothing to check typst against — run 'make docs-current' first."; exit 1; \
+	fi; \
 	have=$$($(TYPST) --version 2>/dev/null | awk 'NR==1 {print $$2}'); have=$${have:-unknown}; \
 	if [ "$$(echo "$$have" | cut -d. -f1,2)" != "$(TYPST_SERIES)" ]; then \
 		echo "  typst $$have, but the handbook is built with the $(TYPST_SERIES) series → $(TYPST_URL)"; \
@@ -175,7 +204,7 @@ tidy: ## Sync go.mod/go.sum with imports (adds transitive deps)
 
 build: ## Compile both binaries into bin/ (the server and the seeding client)
 	@echo ">> build → $(BIN)"
-	@go build -o $(BIN) ./cmd/ranke-db
+	@go build -ldflags "$(LDFLAGS)" -o $(BIN) ./cmd/ranke-db
 	@echo ">> build → $(GEN)"
 	@go build -o $(GEN) ./cmd/generator
 
@@ -212,7 +241,7 @@ SEED_ARGS = $(strip $(if $(filter big,$(SEED)), \
 dev: ## Run a dev server from DEV_CONFIG with /explorer active (SEED=example|release|chain|big to seed it once it answers)
 	@command -v openssl >/dev/null 2>&1 || { echo "ERROR: dev needs openssl to mint a throwaway signing key"; exit 1; }
 	@echo ">> build → $(BIN) (-tags explorer)"
-	@go build -tags explorer -o $(BIN) ./cmd/ranke-db
+	@go build -tags explorer -ldflags "$(LDFLAGS)" -o $(BIN) ./cmd/ranke-db
 	@echo ">> build → $(GEN)"
 	@go build -o $(GEN) ./cmd/generator
 	@addr=$$(grep -o '"addr"[[:space:]]*:[[:space:]]*"[^"]*"' $(DEV_CONFIG) | head -1 | sed -E 's/.*"([^"]*)"$$/\1/'); \
@@ -230,12 +259,15 @@ dev: ## Run a dev server from DEV_CONFIG with /explorer active (SEED=example|rel
 			fi; \
 		fi; \
 		mkdir -p -m 0700 run; \
-		echo ">> $(DEV_CONFIG) — ephemeral signing key, nothing persisted between runs"; \
+		echo ">> $(DEV_CONFIG) — ephemeral signing and founding keys, nothing persisted between runs"; \
 		echo ">> serving on  $$url"; \
 		echo ">> try:  curl $$url/health  ·  curl $$url/branches  ·  curl $$url/branches/main/head  ·  open $$url/explorer"; \
 		echo ">> ctrl-c to stop"; \
 		$(if $(SEED),$(GEN) $(SEED_ARGS) "$$url" --wait 15s &,) \
-		RANKE_SIGNER_KEY="$$(openssl genpkey -algorithm ed25519)" $(BIN) run --dev $(DEV_CONFIG)
+		founder_key=$$(openssl genpkey -algorithm ed25519); \
+		RANKE_SIGNER_KEY="$$(openssl genpkey -algorithm ed25519)" \
+		RANKE_FOUNDER_PUBKEY="$$(printf '%s' "$$founder_key" | openssl pkey -pubout)" \
+		$(BIN) run --dev $(DEV_CONFIG)
 
 # Seeding a server that is already up. An in-memory stack dies with its process, so
 # against the default config this only reaches an instance started by `make dev`.
@@ -284,11 +316,18 @@ check: verify ## Whole-repo quality gate: verify (Go), then frontend/'s own chec
 	@$(MAKE) -C frontend check
 	@$(MAKE) -C frontend test
 
+# $(RANKE_FETCHER)/$(RELEASE_CYCLER) are file targets with no prerequisite, so once
+# cached under bin/ they are never re-fetched on their own — a stale copy (missing a
+# ranke-graph fix, or a whole new document directory) would sit there forever
+# otherwise. upgrade is the one command that already means "bring everything to
+# latest", so refreshing them here is what makes that true rather than aspirational.
 upgrade: ## Upgrade all deps, tools and ranke-go to latest, tidy, then verify; asks before raising the go directive (GO_VERSION=keep|1.26.5, RANKE_GO_VERSION=vX.Y.Z)
 	@GO_VERSION=$(GO_VERSION) \
 		RANKE_GO_MOD=$(RANKE_GO_MOD) \
 		RANKE_GO_VERSION=$(RANKE_GO_VERSION) \
 		./scripts/upgrade.sh
+	@rm -f $(RANKE_FETCHER) $(RELEASE_CYCLER)
+	@$(MAKE) $(RANKE_FETCHER) $(RELEASE_CYCLER)
 
 ranke-ts-version: ## Recommend a ranke-ts bump if a newer release exists
 	-@[ -f $(FRONTEND_PKG) ] && { \
@@ -362,14 +401,14 @@ check-clean-tree:
 	@[ -z "$$(git status --porcelain)" ] || { echo "working tree is dirty — commit or stash before releasing" >&2; exit 1; }
 
 # Same reasoning as check-clean-tree: a missing or misspelled bump word is a free,
-# instant check, and release-gate is not — scripts/release.sh's own case statement
+# instant check, and release-gate is not — release-cycle.sh's own case statement
 # still validates it too, but only after release-gate already ran.
 check-release-bump:
 	@[ -n "$(filter major minor patch breaking feature fix,$(MAKECMDGOALS))" ] || \
 		{ echo "usage: make release <major|breaking | minor|feature | patch|fix>" >&2; exit 1; }
 
-release: check-clean-tree check-release-bump release-gate ## Release: clean → merge to default via PR → tag merged tip → push (bump: major|minor|patch, aliases breaking|feature|fix)
-	@./scripts/release.sh $(filter major minor patch breaking feature fix,$(MAKECMDGOALS))
+release: check-clean-tree check-release-bump release-gate $(RELEASE_CYCLER) ## Release: clean → merge to default via PR → tag merged tip → push (bump: major|minor|patch, aliases breaking|feature|fix)
+	@$(RELEASE_CYCLER) $(filter major minor patch breaking feature fix,$(MAKECMDGOALS))
 
 major minor patch breaking feature fix:
 	@:
@@ -379,9 +418,18 @@ $(RANKE_FETCHER): ## Cache fetch-ranke-docs.sh from ranke-graph (bin/ is gitigno
 	@curl -fsSL $(RANKE_FETCHER_URL) -o $(RANKE_FETCHER)
 	@chmod +x $(RANKE_FETCHER)
 
-# Read by the release workflow, so bumping TYPST_VERSION here moves CI's install with it.
-print-typst-version:
-	@[ -n "$(TYPST_VERSION)" ] || { echo "TYPST_VERSION is empty — CI would install whatever typst is latest" >&2; exit 1; }
+$(RELEASE_CYCLER): ## Cache release-cycle.sh from ranke-graph (bin/ is gitignored — infra, never vendored)
+	@mkdir -p $(dir $(RELEASE_CYCLER))
+	@curl -fsSL $(RELEASE_CYCLER_URL) -o $(RELEASE_CYCLER)
+	@chmod +x $(RELEASE_CYCLER)
+
+# Read by the release workflow, so a TYPST_VERSION bump in ranke-graph moves CI's
+# install with it. docs-current first: the pin now lives in the fetched papers, not
+# a copy of our own, so this is where the fetch actually happens for a workflow that
+# reads the pin before it ever runs `make docs-pdf`.
+print-typst-version: docs-current
+	@[ -n "$(TYPST_VERSION)" ] && [ "$(TYPST_VERSION)" != "unknown" ] || \
+		{ echo "$(PAPERS_DIR)/TYPST_VERSION is missing or unreadable — CI would install whatever typst is latest" >&2; exit 1; }
 	@echo $(TYPST_VERSION)
 
 docs: docs-papers docs-pdf ## Pull the ranke-graph documents, then build this repo's handbook (dist/docs.pdf)
@@ -430,6 +478,8 @@ docs-bundle: docs-check ## Pack this repo's own chapters and REST contract into 
 	@tar -C $(DIST_DIR) -czf $(DOCS_BUNDLE) $(DOCS_BUNDLE_NAME)
 	@rm -rf $(DIST_DIR)/$(DOCS_BUNDLE_NAME)
 	@echo ">> wrote $(DOCS_BUNDLE) — $$(tar -tzf $(DOCS_BUNDLE) | grep -cv '/$$') file(s)"
+	@mkdir -p $(DIST_DIR)
+	@cp $(PAPERS_DIR)/TYPST_VERSION $(DIST_DIR)/TYPST_VERSION
 
 docs-clean: ## Remove the pulled paper references, the built handbook and the packed chapters
 	rm -rf $(PAPERS_DIR) $(DOCS_DIR)/vocabulary.typ $(DOCS_DIR)/handbook.typ $(DOCS_PDF) $(DOCS_BUNDLE)

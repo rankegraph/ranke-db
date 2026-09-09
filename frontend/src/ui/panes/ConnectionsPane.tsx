@@ -60,6 +60,7 @@ function ConnectionRow({ connection }: { connection: Connection }) {
       {result?.state === 'ok' ? (
         <p className="connection-status ok">
           healthy · {result.latencyMs?.toFixed(0)} ms
+          {result.version ? ` · ranke-db ${result.version}` : null}
         </p>
       ) : null}
       {result?.state === 'failed' ? <p className="connection-status bad">{result.detail}</p> : null}

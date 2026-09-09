@@ -28,8 +28,9 @@ type Contribution struct {
 // tags are the wire's: these values are served as they stand, so the names a client
 // reads are fixed here rather than translated on the way out.
 type Health struct {
-	Status string `json:"status"`           // "ok" when serving
-	Signer string `json:"signer,omitempty"` // signing/contributor identity (e.g. "ed25519:…")
+	Status  string `json:"status"`           // "ok" when serving
+	Version string `json:"version"`          // the server build answering (e.g. "v1.19.2")
+	Signer  string `json:"signer,omitempty"` // signing/contributor identity (e.g. "ed25519:…")
 }
 
 // StorageLayer names one storage layer — name and type only, by design.

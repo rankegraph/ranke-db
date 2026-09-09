@@ -33,6 +33,22 @@ func testKeyPEM(t *testing.T) string {
 	return string(pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: der}))
 }
 
+// testFounderPEM is a first contributor's public key in the PEM form sequencer.founder
+// takes. Only the public half ever reaches a config: the archive is founded under it,
+// and whoever contributes keeps the rest.
+func testFounderPEM(t *testing.T) string {
+	t.Helper()
+	pub, _, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatalf("generate founding key: %v", err)
+	}
+	der, err := x509.MarshalPKIXPublicKey(pub)
+	if err != nil {
+		t.Fatalf("marshal founding key: %v", err)
+	}
+	return string(pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: der}))
+}
+
 // TestBuildResolvesAndWires loads a config whose signer key is delegated to an env
 // var and asserts Run resolves it into a working shared signer. With no endpoints,
 // the stack carries just the shared driven ports.
@@ -201,10 +217,11 @@ func TestBuildMissingEnvFails(t *testing.T) {
 // later reaches through Core.
 func TestDevWiresSteerableClock(t *testing.T) {
 	t.Setenv("RANKE_TEST_SIGNER_KEY", testKeyPEM(t))
+	t.Setenv("RANKE_TEST_FOUNDER", testFounderPEM(t))
 	const cfgJSON = `{
 		"signer": {"type": "inmemory", "key": "env(RANKE_TEST_SIGNER_KEY)"},
 		"storage": {"type": "stack", "layers": [{"type": "mem"}]},
-		"sequencer": {"type": "dev"}
+		"sequencer": {"type": "dev", "seed": "test-archive", "founder": "env(RANKE_TEST_FOUNDER)"}
 	}`
 	app, err := Run(context.Background(), strings.NewReader(cfgJSON), nil, true)
 	if err != nil {
@@ -229,7 +246,7 @@ func TestDevRequiresDevSequencer(t *testing.T) {
 	const cfgJSON = `{
 		"signer": {"type": "inmemory", "key": "env(RANKE_TEST_SIGNER_KEY)"},
 		"storage": {"type": "stack", "layers": [{"type": "mem"}]},
-		"sequencer": {"type": "concurrent"}
+		"sequencer": {"type": "concurrent", "seed": "test-archive"}
 	}`
 	if _, err := Run(context.Background(), strings.NewReader(cfgJSON), nil, true); err == nil {
 		t.Fatal("dev=true against sequencer.type \"concurrent\": want error, got none")

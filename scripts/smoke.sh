@@ -22,6 +22,11 @@ fi
 RANKE_SIGNER_KEY="$(openssl genpkey -algorithm ed25519)"
 export RANKE_SIGNER_KEY
 
+# And a first contributor to found the archive under. Only its public half reaches
+# the config: an archive comes into being once, under a key the server never holds.
+RANKE_FOUNDER_PUBKEY="$(printf '%s' "$(openssl genpkey -algorithm ed25519)" | openssl pkey -pubout)"
+export RANKE_FOUNDER_PUBKEY
+
 # The configuration is the composition root: an endpoint listens where its own
 # section says, so the smoke port is set by editing the config, not by a flag. The
 # admin socket moves under $WORK too, so smoke touches nothing outside its own tmpdir.

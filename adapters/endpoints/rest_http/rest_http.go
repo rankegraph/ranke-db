@@ -88,10 +88,11 @@ func New(ctx context.Context, cfg scope.Section, c *core.Core) (*Server, error) 
 	}
 
 	s := &Server{core: c, network: network, address: address, mode: mode, group: group}
-	// /explorer sits outside the generated router: it's a static asset, not part of the
-	// OpenAPI contract, and the generated handler owns "/" as its own catch-all.
+	// Both sit outside the generated router: a static asset and a build banner, neither
+	// part of the OpenAPI contract, while the generated handler owns "/" as its catch-all.
 	mux := http.NewServeMux()
 	mux.Handle("/explorer", explorerHandler(explorer))
+	mux.Handle("/{$}", rootHandler())
 	mux.Handle("/", openapi.Handler(s))
 	// CORS outermost: a preflight carries no credential and must be answered before the
 	// credential is extracted, since a browser sends it without one.
