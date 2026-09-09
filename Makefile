@@ -427,10 +427,18 @@ $(RELEASE_CYCLER): ## Cache release-cycle.sh from ranke-graph (bin/ is gitignore
 # install with it. docs-current first: the pin now lives in the fetched papers, not
 # a copy of our own, so this is where the fetch actually happens for a workflow that
 # reads the pin before it ever runs `make docs-pdf`.
-print-typst-version: docs-current
-	@[ -n "$(TYPST_VERSION)" ] && [ "$(TYPST_VERSION)" != "unknown" ] || \
-		{ echo "$(PAPERS_DIR)/TYPST_VERSION is missing or unreadable — CI would install whatever typst is latest" >&2; exit 1; }
-	@echo $(TYPST_VERSION)
+# stdout carries the version and nothing else: the workflow reads this through $(...)
+# into $GITHUB_OUTPUT, which takes one key=value line and rejects the fetch progress
+# docs-current prints. Hence the sub-make with stdout on stderr, rather than
+# docs-current as a prerequisite — a prerequisite has already printed by the time this
+# recipe runs. The pin is read by the shell, since make expands a whole recipe before
+# running any of it and $(TYPST_VERSION) would still be "unknown" here.
+print-typst-version:
+	@$(MAKE) --no-print-directory docs-current >&2
+	@pin=$$(cat $(PAPERS_DIR)/TYPST_VERSION 2>/dev/null); \
+		[ -n "$$pin" ] && [ "$$pin" != "unknown" ] || \
+			{ echo "$(PAPERS_DIR)/TYPST_VERSION is missing or unreadable — CI would install whatever typst is latest" >&2; exit 1; }; \
+		echo "$$pin"
 
 docs: docs-papers docs-pdf ## Pull the ranke-graph documents, then build this repo's handbook (dist/docs.pdf)
 

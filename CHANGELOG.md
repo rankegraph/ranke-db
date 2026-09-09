@@ -4,6 +4,15 @@ What each release changed for someone depending on this repository.
 
 ## Unreleased
 
+## v1.20.1 — 2026-09-09
+
+### Fixed
+
+- The release workflow reads the typst pin again. `make print-typst-version` ran the
+  paper fetch as a prerequisite, so its progress lines reached stdout alongside the
+  version and `$GITHUB_OUTPUT` received several lines where it takes one — failing the
+  docs job, and with it the release, on `Invalid format`.
+
 ## v1.20.0 — 2026-09-09
 
 ### Added
