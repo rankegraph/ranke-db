@@ -4,6 +4,8 @@ What each release changed for someone depending on this repository.
 
 ## Unreleased
 
+## v1.20.0 — 2026-09-09
+
 ### Added
 
 - `ranke-db found <config> <pubkeyfile>` founds the archive a config points at, under
