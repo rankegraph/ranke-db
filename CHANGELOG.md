@@ -4,6 +4,13 @@ What each release changed for someone depending on this repository.
 
 ## Unreleased
 
+### Fixed
+
+- The release workflow reads the typst pin again. `make print-typst-version` ran the
+  paper fetch as a prerequisite, so its progress lines reached stdout alongside the
+  version and `$GITHUB_OUTPUT` received several lines where it takes one — failing the
+  docs job, and with it the release, on `Invalid format`.
+
 ## v1.20.0 — 2026-09-09
 
 ### Added
@@ -50,13 +57,6 @@ What each release changed for someone depending on this repository.
   `delete_by`, `pubkey_valid_from` and `pubkey_expires_after`, an EDTF Level 1 value
   on `dated`.
 - A request reaching a server whose archive is not founded answers `503`.
-
-### Fixed
-
-- The release workflow reads the typst pin again. `make print-typst-version` ran the
-  paper fetch as a prerequisite, so its progress lines reached stdout alongside the
-  version and `$GITHUB_OUTPUT` received several lines where it takes one — failing the
-  docs job, and with it the release, on `Invalid format`.
 
 ### Removed
 
