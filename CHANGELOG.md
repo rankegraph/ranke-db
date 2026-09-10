@@ -4,6 +4,8 @@ What each release changed for someone depending on this repository.
 
 ## Unreleased
 
+## v1.26.0 — 2026-09-10
+
 ### Changed
 
 - `ranke-client branch create` contributes one claim: the creator's contributor claim,
