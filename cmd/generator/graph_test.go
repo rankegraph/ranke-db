@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"slices"
 	"testing"
@@ -142,46 +141,6 @@ func TestChainIsDeterministic(t *testing.T) {
 				t.Fatalf("claim %d.%d differs between runs: %s vs %s",
 					i, j, first[i].claims[j].ID(), again[i].claims[j].ID())
 			}
-		}
-	}
-}
-
-// TestEncodeContributionRoundTrips reads the body back with the same reader core uses,
-// so the wire contract this client writes is pinned to the one the server reads.
-func TestEncodeContributionRoundTrips(t *testing.T) {
-	g := newTestGrower(t)
-	bs, err := g.example(branchesFor("main", 2))
-	if err != nil {
-		t.Fatalf("example: %v", err)
-	}
-	claims := append([]ranke.Claim{g.selfClaim}, bs[0].claims...)
-
-	body, err := encodeContribution("main", claims)
-	if err != nil {
-		t.Fatalf("encodeContribution: %v", err)
-	}
-
-	var read []ranke.Claim
-	wire := ranke.NewWireReader(bytes.NewReader(body))
-	for wire.Next() {
-		rec := wire.Record()
-		if rec.Kind != ranke.WireClaim {
-			t.Fatalf("record kind = %v, want a claim", rec.Kind)
-		}
-		if rec.Branch != "main" {
-			t.Errorf("record branch = %q, want %q", rec.Branch, "main")
-		}
-		read = append(read, rec.Claim)
-	}
-	if err := wire.Err(); err != nil {
-		t.Fatalf("wire read: %v", err)
-	}
-	if len(read) != len(claims) {
-		t.Fatalf("read %d claims, wrote %d", len(read), len(claims))
-	}
-	for i, claim := range claims {
-		if !read[i].ID().Equal(claim.ID()) {
-			t.Errorf("claim %d read back as %s, wrote %s", i, read[i].ID(), claim.ID())
 		}
 	}
 }

@@ -200,6 +200,14 @@ Classical single-module Go repo at the repo root (module `github.com/rankegraph/
 
 - `openapi/` — the API spec (source of truth) **and** its generated artifacts (Go server `openapi.gen.go`, TS client `openapi.gen.ts`, `openapi.html`, `openapi.md`; the two references symlinked under `docs/openapi/`)
 - `cmd/ranke-db/` — the server binary (`run <config>`, `verify <config>`; later `tui`/config edit)
+- `client/` — the **official Go client**, a plain package in this module (never a nested
+  one: `cmd/` would then need a `replace` or a `go.work`, and `verify` would stop reaching
+  it). It wraps `openapi/client` and writes no request or path of its own, so a spec change
+  breaks the build. All 21 operations, one credential per client, `errors.Is` sentinels over
+  the contract's error codes, and the reader for the two result framings — which live here
+  because they are media types an HTTP response negotiates, where the contribution stream is
+  the format's and stays in ranke-go. Every consumer in this repo goes through it; none
+  carries HTTP of its own
 - `cmd/generator/` — a **client** that seeds a running instance over `POST /contribute`:
   it derives its own contributor identity, signs its own claims, and sends them as a
   contribution stream. Shapes: `example` (4 claims), `release` (the release process drawn in

@@ -6,7 +6,6 @@ package main
 
 import (
 	"fmt"
-	"net/http"
 
 	"github.com/spf13/cobra"
 
@@ -25,14 +24,10 @@ func whoamiCmd(inst *instance.Instance) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			answer, err := api.WhoamiWithResponse(cmd.Context())
+			subject, err := api.Whoami(cmd.Context())
 			if err != nil {
 				return fmt.Errorf("reach %s: %w", inst.URL, err)
 			}
-			if answer.StatusCode() != http.StatusOK {
-				return fmt.Errorf("whoami: HTTP %d: %s", answer.StatusCode(), answer.Body)
-			}
-			subject := answer.JSON200
 			out := cmd.OutOrStdout()
 			fmt.Fprintln(out, "account:", subject.Account)
 			for _, g := range subject.Grants {

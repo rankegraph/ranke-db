@@ -169,6 +169,12 @@ func socketGroup(ctx context.Context, cfg scope.Section) (*int, error) {
 	return &gid, nil
 }
 
+// Handler is the routed endpoint, credential extraction and CORS included, without a
+// listener under it. It is what Serve binds, so a caller driving the routes directly —
+// the Go client's tests, which answer the real handler rather than a stub of their own
+// making — exercises the same stack a request over a socket reaches.
+func (s *Server) Handler() http.Handler { return s.srv.Handler }
+
 // Serve binds the endpoint's listener and runs until ctx is cancelled, then shuts
 // down gracefully. Binding happens here, not in New, so building never claims a port.
 func (s *Server) Serve(ctx context.Context) error {

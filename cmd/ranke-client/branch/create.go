@@ -9,19 +9,17 @@
 package branch
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"net/http"
 	"time"
 
 	"github.com/spf13/cobra"
 
 	"github.com/rankegraph/ranke-go"
 
+	"github.com/rankegraph/ranke-db/client"
 	"github.com/rankegraph/ranke-db/cmd/ranke-client/identity"
 	"github.com/rankegraph/ranke-db/cmd/ranke-client/instance"
-	"github.com/rankegraph/ranke-db/openapi/client"
 )
 
 // TypeBranchCreated records that a branch was established. `contribution/*` is the class
@@ -66,35 +64,16 @@ func createCmd(inst *instance.Instance) *cobra.Command {
 				fmt.Fprintf(cmd.OutOrStdout(), "branch %q already exists, nothing to do\n", name)
 				return nil
 			}
-			body, err := creation(name, pair)
+			built, err := claims(name, pair)
 			if err != nil {
 				return err
 			}
-			return send(cmd, api, inst.URL, name, body)
+			return send(cmd, api, inst.URL, name, built)
 		},
 	}
 	c.Flags().StringVar(&keySpec, "signing-key", "",
 		"the contributor key to sign as: a path, file:path, env:VAR, stdin, or prompt")
 	return c
-}
-
-// creation builds the contribution stream from the claims below.
-func creation(name string, pair ranke.Keypair) ([]byte, error) {
-	built, err := claims(name, pair)
-	if err != nil {
-		return nil, err
-	}
-	var buf bytes.Buffer
-	w := ranke.NewWireWriter(&buf, ranke.WireConstraints{
-		Branches:  []string{name},
-		Creatable: []string{name},
-	})
-	for _, claim := range built {
-		if err := w.WriteClaim(name, claim); err != nil {
-			return nil, fmt.Errorf("write the contribution: %w", err)
-		}
-	}
-	return buf.Bytes(), nil
 }
 
 // claims builds the pair a creation carries: the contributor first, since the record
@@ -130,18 +109,12 @@ func claims(name string, pair ranke.Keypair) ([]ranke.Claim, error) {
 // because a creation claim records an event: re-running would date a second one to now
 // and advance the branch, where the operator meant "make sure this exists". Needs R on
 // $branches, which is the read that pairs with the C this command uses.
-func held(ctx context.Context, api *client.ClientWithResponses, url, name string) (bool, error) {
-	answer, err := api.ListBranchesWithResponse(ctx)
+func held(ctx context.Context, api *client.Client, url, name string) (bool, error) {
+	branches, err := api.Branches(ctx)
 	if err != nil {
 		return false, fmt.Errorf("reach %s: %w", url, err)
 	}
-	if answer.StatusCode() != http.StatusOK {
-		return false, fmt.Errorf("list branches: HTTP %d: %s", answer.StatusCode(), answer.Body)
-	}
-	if answer.JSON200 == nil {
-		return false, nil
-	}
-	for _, b := range answer.JSON200.Branches {
+	for _, b := range branches {
 		if b.Name == name {
 			return true, nil
 		}
@@ -149,23 +122,21 @@ func held(ctx context.Context, api *client.ClientWithResponses, url, name string
 	return false, nil
 }
 
-// send posts the stream and reports what the merge produced.
-func send(cmd *cobra.Command, api *client.ClientWithResponses, url, name string, body []byte) error {
-	answer, err := api.ContributeWithBodyWithResponse(cmd.Context(),
-		"application/cbor-seq", bytes.NewReader(body))
+// send contributes the pair and reports what the merge produced. Creating declares the
+// branch this brings into being: the server intersects what it allows with what the
+// stream asked for, so a creation nobody declared is a creation that does not happen.
+func send(cmd *cobra.Command, api *client.Client, url, name string, built []ranke.Claim) error {
+	// The claims cite nothing outside themselves, a branch that does not exist yet
+	// holding nothing to cite.
+	res, err := api.Contribute(cmd.Context(), nil, name, built, client.Creating(), client.Referencing())
 	if err != nil {
-		return fmt.Errorf("reach %s: %w", url, err)
-	}
-	if answer.StatusCode() != http.StatusCreated {
-		return fmt.Errorf("create %q: HTTP %d: %s", name, answer.StatusCode(), answer.Body)
+		return fmt.Errorf("create %q on %s: %w", name, url, err)
 	}
 	out := cmd.OutOrStdout()
 	fmt.Fprintf(out, "branch %q created\n", name)
-	if answer.JSON201 != nil {
-		fmt.Fprintln(out, "  archive head:", answer.JSON201.Head)
-		for _, id := range answer.JSON201.Ids {
-			fmt.Fprintln(out, "  claim:       ", id)
-		}
+	fmt.Fprintln(out, "  archive head:", res.Head)
+	for _, id := range res.Ids {
+		fmt.Fprintln(out, "  claim:       ", id)
 	}
 	return nil
 }
