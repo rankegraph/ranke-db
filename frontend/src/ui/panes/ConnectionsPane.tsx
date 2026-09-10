@@ -9,7 +9,7 @@
  * configured: the explorer is a client, not an installation.
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   AUTH_LABELS,
   AUTH_SECRET_LABELS,
@@ -37,6 +37,15 @@ function ConnectionRow({ connection }: { connection: Connection }) {
     setProbe(connection.id, { state: 'probing' });
     setProbe(connection.id, await sourceFor(connection, secret).health());
   };
+
+  // Probe on first sight, so opening the tab answers "is this reachable, and what is it"
+  // rather than listing names. `unknown` alone triggers it: a verdict already reached
+  // stands until `test` asks again, so reopening the tab costs nothing.
+  useEffect(() => {
+    if (result !== undefined) return;
+    void test();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connection.id]);
 
   return (
     <div className={`connection${active ? ' is-active' : ''}`}>

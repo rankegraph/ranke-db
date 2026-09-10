@@ -213,8 +213,10 @@ Classical single-module Go repo at the repo root (module `github.com/rankegraph/
   graphology + Sigma v3 + zustand). Static bundle, no application server, no proxy, no
   database of its own; it talks straight to a ranke-db REST endpoint, holds several
   instances at once, and works with none at all against mock data. Its own
-  `package.json` and its own `Makefile`, not wired into the root one: `make -C frontend dev`
-  for the dev server, `make -C frontend` to build the distributable.
+  `package.json` and its own `Makefile`, which the root one reaches at one point only:
+  `make dev` builds `dist/explorer.html` first, since `-tags explorer` embeds it at compile
+  time and a committed bundle is whatever was last released. Otherwise it stands alone —
+  `make -C frontend dev` for the dev server, `make -C frontend` to build the distributable.
 
   Layering is strict and one-way: `core/` is **headless** (store, graph, layouts, mock
   data, connections — no React, no DOM, no Sigma), `render/` owns the Sigma instance at

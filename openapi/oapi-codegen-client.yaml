@@ -1,0 +1,8 @@
+# Code generation config for the Go client side of the API, kept apart from the server's
+# so `ranke-db` links no client it never calls and `ranke-client` links no server.
+# The OpenAPI spec (./openapi.yaml) is the single source of truth for both.
+package: client
+output: openapi/client/client.gen.go
+generate:
+  models: true
+  client: true

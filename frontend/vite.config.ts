@@ -11,8 +11,16 @@ import { defineConfig } from 'vite';
  * into one double-clickable file (see scripts/inline.mjs). A module bundle would be
  * rejected by `file://`; a classic script is not.
  */
+// The build stamps its own version, as the server stamps its binary: EXPLORER_VERSION
+// comes from `git describe` in the Makefile, and a bare `vite build` says "dev" rather
+// than claiming a release it is not.
+const version = process.env.EXPLORER_VERSION || 'dev';
+
 export default defineConfig({
   plugins: [react()],
+  define: {
+    __EXPLORER_VERSION__: JSON.stringify(version),
+  },
   build: {
     outDir: '.build', // scratch — never committed, never served; inline.mjs folds it into explorer.html
     target: 'es2022',
