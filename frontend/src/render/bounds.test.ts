@@ -9,8 +9,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  MAX_NODE_GROWTH,
   MAX_OUTSIDE,
   MIN_COVER,
+  RATIO_FLOOR,
   covered,
   fillRatio,
   fillStretch,
@@ -18,6 +20,8 @@ import {
   holdRange,
   needed,
   ratioCeiling,
+  ratioCeilingBoth,
+  ratioFloor,
   stretchFloor,
 } from './bounds.ts';
 
@@ -87,6 +91,35 @@ test('the ratio ceiling is where the graph has shrunk to exactly the bound', () 
   assert.equal(ceiling, 2);
   // Size runs inversely with ratio, so at the ceiling the graph covers the bound exactly.
   assert.equal(1200 / ceiling, MIN_COVER * VIEWPORT);
+});
+
+// The width alone is what held a one-instant archive at a thousandfold zoom: every claim shares
+// an x, so the picture is a column a node wide, and asking that width to cover its share of the
+// canvas set a ceiling of about a thousandth — which Sigma's camera then clamped the ratio to.
+test('the ceiling over both axes is the one the better-covered axis allows', () => {
+  const canvas = { width: 800, height: 650 };
+  // A column: 1 px wide, the full height. The height's ceiling is the one that means anything.
+  const column = ratioCeilingBoth({ width: 1, height: 650 }, 1, canvas) as number;
+  assert.equal(column, ratioCeiling(650, 1, canvas.height));
+  assert.ok(column > 1, `a picture filling the height was held at ${column}`);
+  // A wide, shallow band is the same case turned on its side.
+  const band = ratioCeilingBoth({ width: 800, height: 4 }, 1, canvas) as number;
+  assert.equal(band, ratioCeiling(800, 1, canvas.width));
+  // With neither axis degenerate, the looser is still the answer, and a measurement that says
+  // nothing on one axis leaves the other to answer alone.
+  assert.equal(ratioCeilingBoth({ width: 800, height: 325 }, 1, canvas), band);
+  assert.equal(ratioCeilingBoth({ width: 0, height: 650 }, 1, canvas), column);
+  assert.equal(ratioCeilingBoth({ width: 0, height: 0 }, 1, canvas), null);
+});
+
+// The bound from the other end: a camera deep enough draws each claim over its neighbours, so
+// what the reader sees is one disc. Stated as growth, since that is what a reader sees of it.
+test('the ratio floor is where a node reaches the growth it is allowed', () => {
+  assert.equal(1 / Math.sqrt(RATIO_FLOOR), MAX_NODE_GROWTH);
+  assert.equal(ratioFloor(null), RATIO_FLOOR);
+  assert.equal(ratioFloor(2), RATIO_FLOOR, 'a ceiling above the floor leaves the floor alone');
+  // Sigma refuses a floor above the ceiling, and a picture that small is already held in place.
+  assert.equal(ratioFloor(0.001), 0.001);
 });
 
 test('the stretch floor is the same bound solved the other way round', () => {

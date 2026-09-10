@@ -59,7 +59,7 @@ referenced closure into the archive.
 - **WHEN** a contribution submits N verified claims
 - **THEN** the sequencer records them under a single new branch table and advances the BTH once
 
-#### Scenario: The new branch table cites its predecessor
+#### Scenario: The new branch table references its predecessor
 - **WHEN** a new branch table is created
 - **THEN** it references the previous branch table as provenance, extending the BTH history
 

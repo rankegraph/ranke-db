@@ -10,7 +10,7 @@
  */
 
 import type Sigma from 'sigma';
-import { fillStretch, hold, ratioCeiling } from './bounds.ts';
+import { fillStretch, hold, ratioCeilingBoth } from './bounds.ts';
 
 export interface Extent {
   x0: number;
@@ -58,14 +58,21 @@ function drawnGraph(
 }
 
 /**
- * ceiling is the largest ratio that still leaves the bound's share of the viewport on graph.
- * Sigma's camera checks it on every state it accepts, so every instrument stops in one place.
+ * ceiling is the largest ratio that still leaves the bound's share of the viewport on graph,
+ * taken over both axes (-> bounds ratioCeilingBoth) — the width alone would hold a one-instant
+ * archive's column of claims at the ratio its own narrowness set. Sigma's camera checks it on
+ * every state it accepts, so every instrument stops in one place.
  */
-export function ceiling(showing: Sigma | null, canvas: number, stretch: Stretch): number | null {
-  if (!showing || canvas <= 0) return null;
+export function ceiling(
+  showing: Sigma | null,
+  width: number,
+  height: number,
+  stretch: Stretch,
+): number | null {
+  if (!showing || (width <= 0 && height <= 0)) return null;
   const rect = drawnGraph(showing, stretch);
   if (!rect) return null;
-  return ratioCeiling(rect.width, showing.getCamera().getState().ratio, canvas);
+  return ratioCeilingBoth(rect, showing.getCamera().getState().ratio, { width, height });
 }
 
 /**

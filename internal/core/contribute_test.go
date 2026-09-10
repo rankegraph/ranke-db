@@ -134,7 +134,7 @@ func TestContributeSpansSeveralBranches(t *testing.T) {
 		Creatable:    []string{"main", "notes"},
 	})
 	// The contributor claim goes to both: each branch is verified as its own graph, so a
-	// branch whose claims cite it must hold it, or that closure is incomplete.
+	// branch whose claims reference it must hold it, or that closure is incomplete.
 	for _, branch := range []string{"main", "notes"} {
 		if err := w.WriteClaim(branch, selfClaim); err != nil {
 			t.Fatalf("WriteClaim: %v", err)

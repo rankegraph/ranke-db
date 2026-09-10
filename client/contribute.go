@@ -26,7 +26,7 @@ func Creating() ContributeOption {
 	return func(c *ranke.WireConstraints) { c.Creatable = append(c.Creatable, c.Branches...) }
 }
 
-// Referencing replaces the scopes the claims may cite, which default to the branch being
+// Referencing replaces the scopes the claims may reference, which default to the branch being
 // written. The server narrows the declaration to what the grants reach.
 func Referencing(scopes ...string) ContributeOption {
 	return func(c *ranke.WireConstraints) { c.Referencable = scopes }

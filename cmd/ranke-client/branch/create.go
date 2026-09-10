@@ -5,7 +5,7 @@
 // limits:  builds and sends one contribution; the branch table and the merge are the server's
 //
 // A branch is a name resolving to a closure, so it exists once a claim points at it, and the
-// contributor claim is the one every later claim on the branch needs anyway. It cites nothing
+// contributor claim is the one every later claim on the branch needs anyway. It references nothing
 // outside itself, so the branch is an independent graph from the start.
 package branch
 
@@ -95,7 +95,7 @@ func held(ctx context.Context, api *client.Client, url, name string) (bool, erro
 // into being, the server intersecting what it allows with what the stream asked for, so a
 // branch created by a typo is one the client asked for.
 func send(cmd *cobra.Command, api *client.Client, url, name string, self ranke.Contributor) error {
-	// Referencing nothing: the claim cites nothing outside itself, which is what keeps the
+	// Referencing nothing: the claim references nothing outside itself, which is what keeps the
 	// branch independent of every other one and needs no read of any of them.
 	res, err := api.Contribute(cmd.Context(), nil, name, []ranke.Claim{self},
 		client.Creating(), client.Referencing())

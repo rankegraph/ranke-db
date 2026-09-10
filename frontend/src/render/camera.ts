@@ -14,7 +14,7 @@ import { graph } from '../core/graph/universe.ts';
 import { axisWidth, stretchX, stretchY, timeDenseExtent } from '../core/timeline.ts';
 import type { Stretch } from '../core/timeline.ts';
 import { activeView, useExplorer } from '../core/store.ts';
-import { stretchFloor } from './bounds.ts';
+import { ratioFloor, stretchFloor } from './bounds.ts';
 import { ceiling, drawnRect, fitStretch, holdTo, offCentreY } from './hold.ts';
 import {
   both,
@@ -49,16 +49,21 @@ function stretchNow(): Stretch {
 }
 
 /**
- * applyBound gives both cameras the ceiling. As a setting, not onto the camera: every settings
- * update reinstalls the limits from settings, wiping a ceiling written to the field.
+ * applyBound gives both cameras the ceiling and the floor. As settings, not onto the camera:
+ * every settings update reinstalls the limits from settings, wiping a ceiling written to the
+ * field. The pair goes in one call — Sigma validates both on every write and throws on a floor
+ * above the ceiling, so a floor written before the ceiling that admits it never lands.
  */
 export function applyBound(): void {
-  const limit = ceiling(showing(), canvasWidth(), stretchNow());
+  const limit = ceiling(showing(), canvasWidth(), canvasHeight(), stretchNow());
+  const floor = ratioFloor(limit);
   for (const each of both()) {
+    if (!each) continue;
     // Setting schedules a refresh, and a stretch applies this on every wheel tick.
-    if (each && each.getSetting('maxCameraRatio') !== limit) {
-      each.setSetting('maxCameraRatio', limit);
+    if (each.getSetting('maxCameraRatio') === limit && each.getSetting('minCameraRatio') === floor) {
+      continue;
     }
+    each.setSettings({ maxCameraRatio: limit, minCameraRatio: floor });
   }
 }
 
@@ -178,9 +183,10 @@ export function fitHeight(): void {
  * exactly as it always was, the same wheel gesture and the same ceiling — only where the
  * *first* look lands changes, the way panIntoView moves the camera without touching the bound.
  *
- * Skips outright where there is nothing to trim: an archive without a lone remote outlier has
- * `denseExtent` equal to the full axis, and stretching to fill it with itself would be a
- * no-op anyway.
+ * An archive without a lone remote outlier has `denseExtent` equal to the full axis, and gets
+ * that whole axis brought to the canvas: a handful of claims minutes apart span a few units of
+ * a box a thousand tall, drawn as a huddle a dozen pixels wide in the middle of an empty
+ * canvas. Where the axis already fills the width the factor comes out at 1 and nothing moves.
  */
 export function fitDenseTime(): void {
   const instance = showing();
@@ -189,7 +195,7 @@ export function fitDenseTime(): void {
   const full = axisWidth();
   if (!instance || width <= 0 || !dense || full === null || full <= 0) return;
   const denseWidth = dense.x1 - dense.x0;
-  if (!(denseWidth > 0) || denseWidth >= full) return;
+  if (!(denseWidth > 0)) return;
 
   const stretch = stretchNow().x;
   const now = cameraNow(instance);

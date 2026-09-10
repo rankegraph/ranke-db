@@ -70,7 +70,8 @@ function HistoryNav() {
 
 /**
  * EdgeInfo shows one edge: its type, and the claims at either end. The direction is the
- * substance — an edge points from a claim to what it cites — so both ends are named and the
+ * substance — an edge runs from the claim that owns it to the claim it references — so both
+ * ends are named and the
  * arrow between them is spelled out rather than implied.
  */
 function EdgeInfo({ edgeKey }: { edgeKey: string }) {
@@ -108,7 +109,7 @@ function EdgeInfo({ edgeKey }: { edgeKey: string }) {
 
       <ExtensionFields fields={detail.fields} />
 
-      <h2>cites from</h2>
+      <h2>owned by</h2>
       <EdgeEnd
         id={detail.from}
         label={detail.fromLabel}
@@ -116,7 +117,7 @@ function EdgeInfo({ edgeKey }: { edgeKey: string }) {
         onSelect={() => revealClaim(detail.from)}
       />
 
-      <h2>to</h2>
+      <h2>references</h2>
       <EdgeEnd
         id={detail.to}
         label={detail.toLabel}

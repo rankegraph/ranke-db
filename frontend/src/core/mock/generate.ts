@@ -122,7 +122,7 @@ function mulberry32(seed: number): () => number {
 /**
  * ContentPool hands out content addresses. An external address is H(bytes), so minting one
  * per claim would add a hash to a record that already costs two; a small pool cycled through
- * instead says several claims cite the same blob — which is what content addressing means,
+ * instead says several claims reference the same blob — which is what content addressing means,
  * not a shortcut around it. Cycled rather than drawn, so the archive a seed produces does
  * not depend on how many claims carry content.
  */
@@ -208,7 +208,7 @@ interface Emit {
   type: string;
   /** Absent only on a root contributor claim, which has nothing to attribute to (§4.3). */
   contributor?: Contributor;
-  /** Every edge names the claim it cites, so the builder can carry what travels with it. */
+  /** Every edge names the claim it references, so the builder can carry what travels with it. */
   edges?: EdgeInput[];
   /** External content of this size, for the classes whose content is a blob. */
   size?: number;
@@ -362,7 +362,7 @@ export function generate(n: number, seedOrOpts: number | GenerateOptions = 0x5ee
     return from[(rnd() * from.length) | 0];
   };
 
-  /** input is one `derivation/input` edge, carrying the claim it cites. */
+  /** input is one `derivation/input` edge, carrying the claim it references. */
   const input = (index: number): EdgeInput => ({
     reference: claimAt(index).id,
     type: 'derivation/input',
@@ -435,7 +435,7 @@ export function generate(n: number, seedOrOpts: number | GenerateOptions = 0x5ee
         });
       }
       // A relation rests on stated provenance like any other claim (§3.5), so the support
-      // edge is not optional: with nothing to cite this is a source instead.
+      // edge is not optional: with nothing to reference this is a source instead.
       const support = drawInput(derivations);
       if (support !== undefined) {
         edges.push(input(support));
@@ -556,7 +556,7 @@ export function generate(n: number, seedOrOpts: number | GenerateOptions = 0x5ee
  * contributor, is 1 rather than 0.
  *
  * The library's `heightOf` says this over *arguments*, which is the wrong shape here: a bulk
- * contribution's head cites tens of thousands of claims, and spreading those into a call is a
+ * contribution's head references tens of thousands of claims, and spreading those into a call is a
  * stack overflow waiting for the granularity sweep to find it.
  */
 function heightOver(contributor: Contributor | undefined, edges: readonly EdgeInput[]): number {

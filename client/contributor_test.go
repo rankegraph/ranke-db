@@ -1,10 +1,12 @@
 // package: client / transport
 // type:    test
-// job:     the contributor claim a key contributes under, and the archive reading them back
+// job:     the contributor claim a key contributes under, admitting a second key to a branch,
+// and the archive reading them back
 // limits:  what a server answers; the key window is contributor_window_test.go's
 package client_test
 
 import (
+	"bytes"
 	"context"
 	"testing"
 	"time"
@@ -31,8 +33,9 @@ func TestNewContributorCarriesTheKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewContributor: %v", err)
 	}
-	if got := len(client.ContributorsFor([]ranke.Claim{self}, key.Pubkey)); got != 1 {
-		t.Error("the claim does not carry its own pubkey")
+	pubkey, err := self.Node().GetInlineContent()
+	if err != nil || !bytes.Equal(pubkey, key.Pubkey) {
+		t.Errorf("the claim carries %x, want its own pubkey %x (%v)", pubkey, key.Pubkey, err)
 	}
 	if self.SigningKey() == nil {
 		t.Error("no signing key bound, so nothing could be signed under it")
@@ -122,23 +125,27 @@ func TestContributorsReadsThemBack(t *testing.T) {
 	ctx := context.Background()
 	s, c := serve(t)
 
-	before, err := c.Contributors(ctx)
+	before, err := c.ContributorsFor(ctx, client.ScopeArchive, s.Contributor.Pubkey)
 	if err != nil {
-		t.Fatalf("Contributors: %v", err)
+		t.Fatalf("ContributorsFor: %v", err)
 	}
-	if len(client.ContributorsFor(before, s.Contributor.Pubkey)) != 0 {
+	if len(before) != 0 {
 		t.Fatal("the case's key is present before it contributed anything")
 	}
 
 	s.seed(t, c, s.note(t, "contributed", storyTime))
 
-	after, err := c.Contributors(ctx)
+	after, err := c.Contributors(ctx, client.ScopeArchive)
 	if err != nil {
 		t.Fatalf("Contributors: %v", err)
 	}
-	if got := len(client.ContributorsFor(after, s.Contributor.Pubkey)); got != 1 {
+	mine, err := c.ContributorsFor(ctx, client.ScopeArchive, s.Contributor.Pubkey)
+	if err != nil {
+		t.Fatalf("ContributorsFor: %v", err)
+	}
+	if len(mine) != 1 {
 		t.Errorf("the contributed key has %d claims among the archive's %d, want 1",
-			got, len(after))
+			len(mine), len(after))
 	}
 	for _, c := range after {
 		if got := c.Node().Type(); got != ranke.NodeContributor {
@@ -177,3 +184,151 @@ func expiryAgainst(t *testing.T, by ranke.Keypair, target ranke.Id, at time.Time
 
 // expiryType is the limiting claim's own type.
 var expiryType = string(ranke.NodeClassContribution) + "/" + string(ranke.NodeSubtypeExpiry)
+
+// TestAKeyIsAdmittedByOneTheBranchHolds: the second writer arrives as a contributor claim
+// carrying its pubkey, attributed to a contributor the branch already holds and signed under
+// that key. The newcomer then signs its own claims onto the branch, each resolving through the
+// claim that admitted it (`V-SIG`) — which is what a branch admitting no writer of its own
+// could not do.
+func TestAKeyIsAdmittedByOneTheBranchHolds(t *testing.T) {
+	ctx := context.Background()
+	s, c := serve(t)
+	const branch = "reports"
+
+	founder, err := client.NewContributor(s.Contributor)
+	if err != nil {
+		t.Fatalf("NewContributor: %v", err)
+	}
+	if _, err := c.Dev().AdvanceClockPast(ctx, []ranke.Claim{founder}); err != nil {
+		t.Fatalf("advance the dev clock: %v", err)
+	}
+	if _, err := c.Contribute(ctx, s.Universe, branch, []ranke.Claim{founder},
+		client.Creating(), client.Referencing()); err != nil {
+		t.Fatalf("create %q: %v", branch, err)
+	}
+
+	// The claim the admission is attributed to, as a writer finds it: read back from the
+	// branch, bound to the key it carries, which needs R on the branch and no `$`-target.
+	mine, err := c.ContributorsFor(ctx, client.Scope(branch), s.Contributor.Pubkey)
+	if err != nil {
+		t.Fatalf("ContributorsFor: %v", err)
+	}
+	if len(mine) != 1 {
+		t.Fatalf("the branch holds %d claims for the founding key, want 1", len(mine))
+	}
+	signing, err := mine[0].AsContributor(ctx, nil, s.Contributor.Private)
+	if err != nil {
+		t.Fatalf("AsContributor: %v", err)
+	}
+
+	// The admission itself, as an application builds one: the newcomer's pubkey stated by a
+	// claim attributed to the contributor the branch already holds.
+	newcomer := newKeypair(t)
+	admission, err := ranke.NewClaim(ranke.NodeContributor, signing).
+		WithInlineContent(newcomer.Pubkey).
+		WithEncoding(ranke.EncodingOctetStream).
+		WithHeight(signing.Node().Height() + 1).
+		Sign()
+	if err != nil {
+		t.Fatalf("sign the admission: %v", err)
+	}
+	if _, err := c.Dev().AdvanceClockPast(ctx, []ranke.Claim{admission}); err != nil {
+		t.Fatalf("advance the dev clock: %v", err)
+	}
+	if _, err := c.Contribute(ctx, s.Universe, branch, []ranke.Claim{admission}); err != nil {
+		t.Fatalf("admit the newcomer: %v", err)
+	}
+
+	admitted, err := c.ContributorsFor(ctx, client.Scope(branch), newcomer.Pubkey)
+	if err != nil {
+		t.Fatalf("ContributorsFor: %v", err)
+	}
+	if len(admitted) != 1 {
+		t.Fatalf("the branch holds %d claims for the admitted key, want 1", len(admitted))
+	}
+
+	// The point of the admission: the newcomer's own key now writes to the branch.
+	as, err := admission.AsContributor(ctx, nil, newcomer.Private)
+	if err != nil {
+		t.Fatalf("AsContributor for the newcomer: %v", err)
+	}
+	note, err := ranke.NewClaim("entity/note", as).
+		WithInlineContent([]byte("written by the admitted key")).
+		WithEncoding(ranke.EncodingText("plain")).
+		WithHeight(as.Node().Height() + 1).
+		Sign()
+	if err != nil {
+		t.Fatalf("sign under the admitted key: %v", err)
+	}
+	if _, err := c.Dev().AdvanceClockPast(ctx, []ranke.Claim{note}); err != nil {
+		t.Fatalf("advance the dev clock: %v", err)
+	}
+	if _, err := c.Contribute(ctx, s.Universe, branch, []ranke.Claim{note}); err != nil {
+		t.Fatalf("contribute under the admitted key: %v", err)
+	}
+	if _, err := c.GetClaim(ctx, client.Scope(branch), note.ID()); err != nil {
+		t.Errorf("%s is not on the branch: %v", note.ID(), err)
+	}
+}
+
+// TestABranchListsOnlyItsOwnContributors: the branch-scoped read answers for one closure, so a
+// key one branch admits is absent from another that never admitted it. `$archive` is the read
+// that spans them, and needs R on a `$`-target no tenant holds.
+func TestABranchListsOnlyItsOwnContributors(t *testing.T) {
+	ctx := context.Background()
+	s, c := serve(t)
+	keys := map[string]ranke.Keypair{"reports": newKeypair(t), "audits": newKeypair(t)}
+
+	for branch, key := range keys {
+		self, err := client.NewContributor(key)
+		if err != nil {
+			t.Fatalf("NewContributor: %v", err)
+		}
+		if _, err := c.Dev().AdvanceClockPast(ctx, []ranke.Claim{self}); err != nil {
+			t.Fatalf("advance the dev clock: %v", err)
+		}
+		if _, err := c.Contribute(ctx, s.Universe, branch, []ranke.Claim{self},
+			client.Creating(), client.Referencing()); err != nil {
+			t.Fatalf("create %q: %v", branch, err)
+		}
+	}
+
+	for branch, key := range keys {
+		own, err := c.ContributorsFor(ctx, client.Scope(branch), key.Pubkey)
+		if err != nil {
+			t.Fatalf("ContributorsFor(%q): %v", branch, err)
+		}
+		if len(own) != 1 {
+			t.Errorf("branch %q holds %d claims for its own key, want 1", branch, len(own))
+		}
+		for other, elsewhere := range keys {
+			if other == branch {
+				continue
+			}
+			foreign, err := c.ContributorsFor(ctx, client.Scope(branch), elsewhere.Pubkey)
+			if err != nil {
+				t.Fatalf("ContributorsFor(%q): %v", branch, err)
+			}
+			if len(foreign) != 0 {
+				t.Errorf("branch %q holds %d claims for %q's key, want none",
+					branch, len(foreign), other)
+			}
+		}
+		// No limiting claim was made against either key, so the branch binds no window.
+		if expiries, err := c.Expiries(ctx, client.Scope(branch)); err != nil {
+			t.Errorf("Expiries(%q): %v", branch, err)
+		} else if len(expiries) != 0 {
+			t.Errorf("branch %q holds %d expiries, want none", branch, len(expiries))
+		}
+	}
+
+	for branch, key := range keys {
+		all, err := c.ContributorsFor(ctx, client.ScopeArchive, key.Pubkey)
+		if err != nil {
+			t.Fatalf("ContributorsFor($archive): %v", err)
+		}
+		if len(all) != 1 {
+			t.Errorf("the archive holds %d claims for %q's key, want 1", len(all), branch)
+		}
+	}
+}

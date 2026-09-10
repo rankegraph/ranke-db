@@ -33,6 +33,11 @@ var (
 	ErrCredentials = errors.New("ranke/client: present one credential, not several")
 	// ErrNilClaim is a nil claim, or a nil id in a by-id read.
 	ErrNilClaim = errors.New("ranke/client: nil claim")
+	// ErrNoPubkey is a read narrowed to a key, with no key given.
+	ErrNoPubkey = errors.New("ranke/client: a pubkey is required")
+	// ErrUniverseNeedsHead is a closure read asked of `$universe`, which offers no head to
+	// walk from and requires one (`R-QHEAD`); a claim there is reached by id.
+	ErrUniverseNeedsHead = errors.New("ranke/client: a $universe read needs a head")
 	// ErrNoUniverse is external content named with no Universe to read the bytes from.
 	ErrNoUniverse = errors.New("ranke/client: claims name external content, so a Universe is required")
 	// ErrContentMissing is a blob a claim addresses that the Universe does not hold.

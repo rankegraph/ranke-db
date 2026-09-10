@@ -128,7 +128,7 @@ export function mount(container: HTMLElement): Sigma {
  */
 function sigmaSettings(): Partial<Settings> {
   return {
-    // Arrows: every edge points from a claim to what it cites, and a graph of provenance
+    // Arrows: every edge runs from a claim to the claim it references, and a graph of provenance
     // without direction drawn is not readable.
     defaultEdgeType: 'arrow',
     // Every edge's label is blank except the selected claim's (-> edgeReducer); Sigma's own
@@ -255,7 +255,7 @@ export function refreshSelection(): void {
 /**
  * highlight repaints the affected nodes and the edges they own — cheap, since hover must never
  * cost a full O(N) refresh. A claim is a node and its outgoing edges, so highlighting one means
- * both: showing only the dot would leave out what it cites, most of what a claim says.
+ * both: showing only the dot would leave out what it references, most of what a claim says.
  */
 export function highlight(nodes: string[]): void {
   const instance = showing();

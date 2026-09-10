@@ -1,17 +1,18 @@
 /**
  * package: render / bounds
  * type:    logic
- * job:     the one bound on where the camera may go — how much viewport may miss the graph
+ * job:     the bounds on the camera — how much viewport may miss the graph, and how large a
+ *          claim may be drawn
  * limits:  arithmetic only; applying it to the camera is the renderer's (-> render/renderer)
  *
  * The picture moves under two independent instruments: the wheel stretches an axis in graph
  * space, and show-all, a marked box and a drag move the camera. A bound on either one alone is a
- * bound the other can walk straight past, which is how a branch selection used to land at an
- * x-zoom the wheel could neither reach nor undo.
+ * bound the other walks straight past, which is how a branch selection used to land at an x-zoom
+ * the wheel could neither reach nor undo. So it is stated on what a reader can actually see: the
+ * drawn graph against the viewport, one clamp answering both instruments.
  *
- * So the bound is stated on what a reader can actually see: the drawn graph against the
- * viewport. It is two rules over the same measurement — how small a zoom may draw the graph, and
- * where a pan may then put it — and one clamp answers both, whichever instrument moved.
+ * Zooming in is bounded off the claims instead: Sigma magnifies a node as the camera goes in,
+ * until each one covers its neighbours and the reader has a single disc (-> MAX_NODE_GROWTH).
  */
 
 /**
@@ -66,6 +67,41 @@ export function fillRatio(size: number, ratio: number, viewport: number): number
 /** ratioCeiling is the largest camera ratio that still covers the bound's share of the viewport. */
 export function ratioCeiling(size: number, ratio: number, viewport: number): number | null {
   return fillRatio(size, ratio, MIN_COVER * viewport);
+}
+
+/**
+ * ratioCeilingBoth is the ceiling over both axes: the looser of the two, since one dimension is
+ * all a picture shaped like a column or a band can cover. Read off the width alone, an archive
+ * whose claims share one instant sets a ceiling as narrow as that column, holding the camera a
+ * thousandfold in with every node drawn thirty times over.
+ */
+export function ratioCeilingBoth(
+  size: { width: number; height: number },
+  ratio: number,
+  canvas: { width: number; height: number },
+): number | null {
+  const byWidth = ratioCeiling(size.width, ratio, canvas.width);
+  const byHeight = ratioCeiling(size.height, ratio, canvas.height);
+  if (byWidth === null) return byHeight;
+  if (byHeight === null) return byWidth;
+  return Math.max(byWidth, byHeight);
+}
+
+/**
+ * How far past its own radius a claim may be drawn. Sigma draws a node at `size / √ratio`, so a
+ * camera a thousandfold in draws a hub of radius 14 at 440 px across.
+ */
+export const MAX_NODE_GROWTH = 4;
+
+/** RATIO_FLOOR is the deepest camera ratio that keeps a node inside that growth. */
+export const RATIO_FLOOR = 1 / (MAX_NODE_GROWTH * MAX_NODE_GROWTH);
+
+/**
+ * ratioFloor keeps that floor under whatever ceiling is in force: Sigma refuses a pair with the
+ * floor above the ceiling, and a picture that small is already held in place by the ceiling.
+ */
+export function ratioFloor(ceiling: number | null): number {
+  return ceiling === null ? RATIO_FLOOR : Math.min(RATIO_FLOOR, ceiling);
 }
 
 /**
