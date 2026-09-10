@@ -4,8 +4,8 @@
 // limits:  builds and sends one contribution; verification and the merge are the server's
 //
 // A branch is a name resolving to a closure, so it exists once a claim points at it. The
-// contribution carries two: the creator's own contributor claim, without which nothing in
-// the branch could be signed, and a claim recording that the branch was created.
+// creator's contributor travels along only where the archive holds none
+// (-> client.ResolveContributor).
 package branch
 
 import (
@@ -18,37 +18,41 @@ import (
 	"github.com/rankegraph/ranke-go"
 
 	"github.com/rankegraph/ranke-db/client"
-	"github.com/rankegraph/ranke-db/cmd/ranke-client/identity"
+	"github.com/rankegraph/ranke-db/cmd/ranke-client/contributor"
 	"github.com/rankegraph/ranke-db/cmd/ranke-client/instance"
 )
 
-// TypeBranchCreated records that a branch was established. `contribution/*` is the class
-// for a claim about contributors or their actions on the graph (foundation paper §Type
-// Vocabulary), and subtype vocabulary is open; `R-C2TYPE` reserves only delete, expiry
-// and branches to the Sequencer.
+// TypeBranchCreated records that a branch was established: `contribution/*` is the class for
+// a claim about contributors' actions, its subtypes open where `R-C2TYPE` reserves only
+// delete, expiry and branches to the Sequencer.
 const TypeBranchCreated = "contribution/branch_created"
 
 // createCmd sends the one contribution that establishes a branch.
 func createCmd(inst *instance.Instance) *cobra.Command {
-	var keySpec string
+	var keySpec, pickSpec string
+	var register bool
 	c := &cobra.Command{
 		Use:   "create <name>",
 		Short: "Create a branch by contributing the claim that records it",
-		Long: "Contributes the creator's contributor claim and a claim recording that the\n" +
-			"branch was created. The contributor claim travels with it because a branch\n" +
-			"holding none admits no writer: every claim's signature resolves through a\n" +
-			"contributor its closure reaches.\n\n" +
+		Long: "Contributes a claim recording that the branch was created, attributed to the\n" +
+			"contributor the signing key resolves to: the claim the archive already holds\n" +
+			"for that key, referenced across the branch boundary, or a freshly registered\n" +
+			"one where the key is contributing for the first time. A key is registered\n" +
+			"once and referenced from then on, a second claim over one pubkey being a\n" +
+			"second identity rather than the same one twice.\n\n" +
 			"A branch that already exists is reported as such and left alone, so this can be\n" +
 			"run before every deployment without adding a second record of a creation that\n" +
 			"happened once.\n\n" +
-			"Needs C on $branches to add the entry, and C on the branch to fill it.",
+			"Needs C on $branches to add the entry, C on the branch to fill it, R on\n" +
+			"$branches to see what exists, and R on $archive to resolve the key to the\n" +
+			"contributor it already has there.",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := args[0]
 			if err := ranke.ValidateBranchName(name); err != nil {
 				return err
 			}
-			pair, err := identity.Load(keySpec, cmd.InOrStdin())
+			pair, err := contributor.Load(keySpec, cmd.InOrStdin())
 			if err != nil {
 				return err
 			}
@@ -64,51 +68,87 @@ func createCmd(inst *instance.Instance) *cobra.Command {
 				fmt.Fprintf(cmd.OutOrStdout(), "branch %q already exists, nothing to do\n", name)
 				return nil
 			}
-			built, err := claims(name, pair)
+			self, err := resolve(cmd, api, pair, pickSpec, register)
 			if err != nil {
 				return err
 			}
-			return send(cmd, api, inst.URL, name, built)
+			built, err := claims(name, self)
+			if err != nil {
+				return err
+			}
+			return send(cmd, api, inst.URL, name, self, built)
 		},
 	}
 	c.Flags().StringVar(&keySpec, "signing-key", "",
 		"the contributor key to sign as: a path, file:path, env:VAR, stdin, or prompt")
+	c.Flags().StringVar(&pickSpec, "contributor", "",
+		"the id of the contributor claim to sign as, where the key carries more than one")
+	c.Flags().BoolVar(&register, "register-identity", false,
+		"register the signing key as a first-time contributor, without reading the archive "+
+			"to check: for an account holding no R on $archive, and wrong for a key that "+
+			"already has a contributor claim")
 	return c
 }
 
-// claims builds the pair a creation carries: the contributor first, since the record
-// below it references it, then the record itself.
-func claims(name string, pair ranke.Keypair) ([]ranke.Claim, error) {
-	// Epoch-dated, so one key yields one contributor id however often this runs — the
-	// claim is an identity, not an event, and a fresh id each time would fork the
-	// identity rather than reuse it.
-	contributor, err := ranke.NewClaim(ranke.NodeContributor, nil).
-		WithInlineContent(pair.Pubkey).
-		WithEncoding(ranke.EncodingOctetStream).
-		WithCreatedAt(time.Unix(0, 0).UTC()).
-		Sign(pair.Private)
-	if err != nil {
-		return nil, fmt.Errorf("sign the contributor claim: %w", err)
+// resolve settles which contributor the record is attributed to, and reports it: a
+// provisioning log wants to show whether the key was registered here or found already.
+func resolve(cmd *cobra.Command, api *client.Client, pair ranke.Keypair, pickSpec string, register bool) (*client.Contributor, error) {
+	if register {
+		return client.RegisterContributor(pair)
 	}
-	self, err := contributor.AsContributor(context.Background(), nil, pair.Private)
+	pick, err := pickedContributor(pickSpec)
 	if err != nil {
-		return nil, fmt.Errorf("read the contributor claim: %w", err)
+		return nil, err
 	}
-	record, err := ranke.NewClaim(TypeBranchCreated, self).
+	// The record is dated now, so now is the date its contributor's key must admit
+	// (`R-C4KEY`).
+	self, err := api.ResolveContributor(cmd.Context(), pair, time.Now().UTC(), pick)
+	if err != nil {
+		return nil, err
+	}
+	out := cmd.OutOrStdout()
+	if self.Registered {
+		fmt.Fprintln(out, "contributor:   ", self.Claim.ID(), "(already registered,", self.Window, ")")
+	} else {
+		fmt.Fprintln(out, "contributor:   ", self.Claim.ID(), "(registering, first contribution)")
+	}
+	return self, nil
+}
+
+// pickedContributor reads the --contributor flag, which names one of several claims a key
+// carries. `contributor list` is where an operator reads the ids.
+func pickedContributor(spec string) (ranke.Id, error) {
+	if spec == "" {
+		return nil, nil
+	}
+	id, err := ranke.ParseId(spec)
+	if err != nil {
+		return nil, fmt.Errorf("--contributor %q: %w", spec, err)
+	}
+	return id, nil
+}
+
+// claims builds what the creation contributes: the record, preceded by the contributor claim
+// where the key is being registered in the same breath.
+func claims(name string, self *client.Contributor) ([]ranke.Claim, error) {
+	// One past the contributor it cites (`V-HEIGHT`): a registration signs itself at 0, an
+	// attested claim higher.
+	record, err := ranke.NewClaim(TypeBranchCreated, self.As).
 		WithInlineContent([]byte(name)).
 		WithEncoding(ranke.EncodingText("plain")).
-		WithHeight(1).
-		Sign(pair.Private)
+		WithHeight(self.Claim.Node().Height() + 1).
+		Sign()
 	if err != nil {
 		return nil, fmt.Errorf("sign the creation claim: %w", err)
 	}
-	return []ranke.Claim{contributor, record}, nil
+	if self.Registered {
+		return []ranke.Claim{record}, nil
+	}
+	return []ranke.Claim{self.Claim, record}, nil
 }
 
-// held reports whether the archive already carries the branch. Asked before contributing
-// because a creation claim records an event: re-running would date a second one to now
-// and advance the branch, where the operator meant "make sure this exists". Needs R on
-// $branches, which is the read that pairs with the C this command uses.
+// held reports whether the archive already carries the branch, asked because a creation
+// claim records an event: re-running would date a second one to now. Needs R on $branches.
 func held(ctx context.Context, api *client.Client, url, name string) (bool, error) {
 	branches, err := api.Branches(ctx)
 	if err != nil {
@@ -122,13 +162,16 @@ func held(ctx context.Context, api *client.Client, url, name string) (bool, erro
 	return false, nil
 }
 
-// send contributes the pair and reports what the merge produced. Creating declares the
-// branch this brings into being: the server intersects what it allows with what the
-// stream asked for, so a creation nobody declared is a creation that does not happen.
-func send(cmd *cobra.Command, api *client.Client, url, name string, built []ranke.Claim) error {
-	// The claims cite nothing outside themselves, a branch that does not exist yet
-	// holding nothing to cite.
-	res, err := api.Contribute(cmd.Context(), nil, name, built, client.Creating(), client.Referencing())
+// send contributes the claims and reports the merge. Creating declares the branch brought
+// into being, the server intersecting what it allows with what the stream asked for.
+func send(cmd *cobra.Command, api *client.Client, url, name string, self *client.Contributor, built []ranke.Claim) error {
+	// A registered contributor is cited where it stands, the archive scope reaching whichever
+	// branch that is; a registration cites nothing outside itself.
+	opts := []client.ContributeOption{client.Creating(), client.Referencing()}
+	if self.Registered {
+		opts = []client.ContributeOption{client.Creating(), client.Referencing(ranke.BranchArchive)}
+	}
+	res, err := api.Contribute(cmd.Context(), nil, name, built, opts...)
 	if err != nil {
 		return fmt.Errorf("create %q on %s: %w", name, url, err)
 	}

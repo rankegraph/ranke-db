@@ -16,6 +16,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/rankegraph/ranke-db/cmd/ranke-client/branch"
+	"github.com/rankegraph/ranke-db/cmd/ranke-client/contributor"
 	"github.com/rankegraph/ranke-db/cmd/ranke-client/instance"
 )
 
@@ -46,6 +47,6 @@ func rootCmd() *cobra.Command {
 		"X-API-Key credential")
 	root.PersistentFlags().StringVar(&inst.Macaroon, "macaroon", "",
 		"Authorization: Macaroon credential, base64 — the one credential carrying caveats")
-	root.AddCommand(whoamiCmd(&inst), branch.Cmd(&inst), versionCmd())
+	root.AddCommand(whoamiCmd(&inst), branch.Cmd(&inst), contributor.Cmd(&inst), versionCmd())
 	return root
 }
