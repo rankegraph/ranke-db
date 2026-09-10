@@ -186,3 +186,38 @@ func TestContributeOfNothingSendsNothing(t *testing.T) {
 		t.Fatalf("Contribute(nil) = %+v, want nothing merged", res)
 	}
 }
+
+// TestAClaimBreakingARuleIsRefusedAsInvalid: verification judges the claims submitted, so a
+// claim it refuses is answered 400 invalid with the rule named, where it was answered 500
+// internal — a status that told a client to retry a fault of the server's rather than to
+// correct the claim.
+func TestAClaimBreakingARuleIsRefusedAsInvalid(t *testing.T) {
+	ctx := context.Background()
+	s, c := serve(t)
+
+	// A height no reference supports: the contributor claim sits at 0, so `V-HEIGHT` admits
+	// 1 alone, and the server re-derives it.
+	wrong := s.claim(t, ranke.NewClaim("entity/note", s.asContributor(t)).
+		WithInlineContent([]byte("a claim carrying the wrong height")).
+		WithEncoding(ranke.EncodingText("plain")).
+		WithHeight(5))
+	if _, err := c.Dev().AdvanceClockPast(ctx, []ranke.Claim{s.Self, wrong}); err != nil {
+		t.Fatalf("advance the dev clock: %v", err)
+	}
+
+	_, err := c.Contribute(ctx, s.Universe, testBranch, []ranke.Claim{s.Self, wrong})
+	if !errors.Is(err, client.ErrInvalid) {
+		t.Fatalf("err = %v, want ErrInvalid", err)
+	}
+	var refused *client.Error
+	if !errors.As(err, &refused) {
+		t.Fatalf("err = %v, want a *client.Error carrying the status", err)
+	}
+	if refused.Status != 400 {
+		t.Errorf("status %d, want 400: the claim is the caller's to correct", refused.Status)
+	}
+	if !bytes.Contains([]byte(refused.Message), []byte("height")) {
+		t.Errorf("the refusal reads %q, and a caller correcting the claim needs the rule "+
+			"verification named", refused.Message)
+	}
+}
