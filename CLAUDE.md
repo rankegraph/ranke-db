@@ -161,6 +161,16 @@ Never hand-edit `*.gen.*` or the generated client/references — change the spec
   `rql.schema.json` are ranke-graph's to publish, and a second copy here would be a second
   source of truth.
 
+## Committing
+
+**Commit what is staged, and nothing else.** Never `git add` on the user's behalf —
+not `git add -A`, not the files you just wrote — and never commit unasked, however
+finished the work looks. The index is where the user says what belongs in a commit;
+staging for them replaces that decision with a guess, in a commit that carries their
+name, and unstaged work in the tree is work they have not agreed to yet. Asked to
+commit with nothing staged, ask what belongs in it rather than reading it off
+`git status`.
+
 ## Changelog
 
 `CHANGELOG.md` records what each release changed for someone who depends on

@@ -1,7 +1,6 @@
 // package: contributor / cmd
 // type:    entrypoint
-// job:     `contributor list` — every contributor the archive holds, with its key window and
-// whether another claim shares its pubkey
+// job:     `contributor list` — every contributor the archive holds, with its key window
 // limits:  reads and reports; the answer is the server's (-> client.Contributors)
 package contributor
 
@@ -28,9 +27,9 @@ func listCmd(inst *instance.Instance) *cobra.Command {
 		Short: "List the contributors the archive holds",
 		Long: "Reports each contribution/contributor claim: its id, the pubkey it carries, when\n" +
 			"it was added, and the validity window its key holds — shortened where an expiry\n" +
-			"was requested against it (`R-DEXPIRY`). A pubkey carried by more than one claim\n" +
-			"is named as such: claims signed under it resolve to more than one contributor,\n" +
-			"which nothing can retract, a contributor claim never being deleted.\n\n" +
+			"was requested against it (`R-DEXPIRY`). One pubkey may be carried by several\n" +
+			"claims — a branch holds its own, so a key writing to several has one in each —\n" +
+			"and each is listed on its own.\n\n" +
 			"Needs R on $archive. --signing-key narrows the listing to one key's own.",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
@@ -70,7 +69,6 @@ func list(ctx context.Context, out io.Writer, api *client.Client, url string, on
 	if err != nil {
 		return err
 	}
-	shared := sharing(held)
 	shown := 0
 	for _, c := range held {
 		pubkey, err := c.Node().GetInlineContent()
@@ -80,7 +78,7 @@ func list(ctx context.Context, out io.Writer, api *client.Client, url string, on
 		if only != nil && string(pubkey) != string(only) {
 			continue
 		}
-		report(out, c, pubkey, windows[c.ID().String()], at, shared[string(pubkey)])
+		report(out, c, pubkey, windows[c.ID().String()], at)
 		shown++
 	}
 	if shown == 0 {
@@ -90,16 +88,11 @@ func list(ctx context.Context, out io.Writer, api *client.Client, url string, on
 }
 
 // report writes one contributor's block.
-func report(out io.Writer, c ranke.Claim, pubkey []byte, window client.ContributorWindow, at time.Time, sharers []ranke.Id) {
+func report(out io.Writer, c ranke.Claim, pubkey []byte, window client.ContributorWindow, at time.Time) {
 	fmt.Fprintln(out, c.ID())
 	fmt.Fprintln(out, "  pubkey  ", hex.EncodeToString(pubkey))
 	fmt.Fprintln(out, "  created ", c.Node().CreatedAt().UTC().Format(time.RFC3339))
-	fmt.Fprintln(out, "  window  ", window, status(window, at))
-	for _, other := range sharers {
-		if !other.Equal(c.ID()) {
-			fmt.Fprintln(out, "  shares its pubkey with", other)
-		}
-	}
+	fmt.Fprintln(out, "  window  ", window, "·", status(window, at))
 }
 
 // status judges a window at at, which is what decides whether a claim signed now under this
@@ -107,29 +100,10 @@ func report(out io.Writer, c ranke.Claim, pubkey []byte, window client.Contribut
 func status(w client.ContributorWindow, at time.Time) string {
 	switch {
 	case w.Admits(at):
-		return "— valid now"
+		return "valid now"
 	case w.From != nil && at.Before(*w.From):
-		return "— not yet valid"
+		return "not yet valid"
 	default:
-		return "— lapsed"
+		return "lapsed"
 	}
-}
-
-// sharing indexes the claims by pubkey, for the keys carried by more than one. That is the
-// state a second registration leaves, and the reason a resolve can be ambiguous.
-func sharing(held []ranke.Claim) map[string][]ranke.Id {
-	by := map[string][]ranke.Id{}
-	for _, c := range held {
-		pubkey, err := c.Node().GetInlineContent()
-		if err != nil {
-			continue
-		}
-		by[string(pubkey)] = append(by[string(pubkey)], c.ID())
-	}
-	for key, ids := range by {
-		if len(ids) < 2 {
-			delete(by, key)
-		}
-	}
-	return by
 }

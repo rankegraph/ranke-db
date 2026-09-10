@@ -1,6 +1,6 @@
 // package: contributor / cmd
 // type:    logic
-// job:     resolve a --signing-key argument to the contributor identity it names
+// job:     resolve a --signing-key argument to the contributor key it names
 // limits:  a seam over keysource and ParseKeypair; the grammar and its refusals are the
 // library's (-> github.com/rankegraph/ranke-go/keysource)
 //
