@@ -52,7 +52,7 @@ func rootCmd() *cobra.Command {
 	f.StringVar(&o.token, "token", "", "Authorization: Bearer credential")
 	f.StringVar(&o.apiKey, "api-key", "", "X-API-Key credential")
 	f.DurationVar(&o.wait, "wait", 0, "wait up to this long for the server to answer /health before writing")
-	root.AddCommand(exampleCmd(&o), chainCmd(&o), releaseCmd(&o))
+	root.AddCommand(exampleCmd(&o), chainCmd(&o), releaseCmd(&o), versionCmd())
 	return root
 }
 

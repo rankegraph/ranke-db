@@ -44,6 +44,6 @@ func rootCmd() *cobra.Command {
 		"Authorization: Bearer credential")
 	root.PersistentFlags().StringVar(&inst.APIKey, "api-key", "",
 		"X-API-Key credential")
-	root.AddCommand(whoamiCmd(&inst), branch.Cmd(&inst))
+	root.AddCommand(whoamiCmd(&inst), branch.Cmd(&inst), versionCmd())
 	return root
 }

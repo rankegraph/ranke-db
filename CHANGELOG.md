@@ -35,6 +35,13 @@ What each release changed for someone depending on this repository.
 
 ### Changed
 
+- Every binary carries a `version` subcommand — `ranke-db version`, `ranke-client
+  version`, `generator version` — printing the build it is. `make build` compiles and
+  stamps all three, where it built two and stamped one.
+- A release carries `ranke-client` beside `ranke-db`, and both are stamped with the tag
+  they were cut from rather than leaving the version to the toolchain's VCS stamping.
+- The release matrix drops `darwin-amd64`, leaving `linux-amd64`, `linux-arm64` and
+  `darwin-arm64`.
 - ranke-go v0.31.0, whose `keysource` package and `ParseKeypair` replace a hand-written
   copy of both here.
 

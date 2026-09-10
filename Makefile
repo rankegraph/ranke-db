@@ -116,6 +116,7 @@ BROKKR_INSTALL_SH := https://raw.githubusercontent.com/flocko-motion/sindri/mast
         pull-rql-schema check-rql-schema check-generated release-gate check-clean-tree check-release-bump
 
 BIN := bin/ranke-db
+CLI := bin/ranke-client
 GEN := bin/generator
 
 .DEFAULT_GOAL := all
@@ -204,11 +205,13 @@ generate: check-tools ## Generate every artifact from the spec into openapi/ (Go
 tidy: ## Sync go.mod/go.sum with imports (adds transitive deps)
 	@go mod tidy
 
-build: ## Compile both binaries into bin/ (the server and the seeding client)
+build: ## Compile every binary into bin/ (the server, the client, the seeding fixture)
 	@echo ">> build → $(BIN)"
 	@go build -ldflags "$(LDFLAGS)" -o $(BIN) ./cmd/ranke-db
+	@echo ">> build → $(CLI)"
+	@go build -ldflags "$(LDFLAGS)" -o $(CLI) ./cmd/ranke-client
 	@echo ">> build → $(GEN)"
-	@go build -o $(GEN) ./cmd/generator
+	@go build -ldflags "$(LDFLAGS)" -o $(GEN) ./cmd/generator
 
 DEV_CONFIG ?= examples/minimal/config.json
 SEED_URL   ?= http://localhost:8080
@@ -249,7 +252,7 @@ dev: explorer ## Run a dev server from DEV_CONFIG with /explorer active (SEED=ex
 	@echo ">> build → $(BIN) (-tags explorer)"
 	@go build -tags explorer -ldflags "$(LDFLAGS)" -o $(BIN) ./cmd/ranke-db
 	@echo ">> build → $(GEN)"
-	@go build -o $(GEN) ./cmd/generator
+	@go build -ldflags "$(LDFLAGS)" -o $(GEN) ./cmd/generator
 	@addr=$$(grep -o '"addr"[[:space:]]*:[[:space:]]*"[^"]*"' $(DEV_CONFIG) | head -1 | sed -E 's/.*"([^"]*)"$$/\1/'); \
 		addr=$${addr:-:8080}; port=$${addr#:}; url="http://localhost$$addr"; \
 		if command -v lsof >/dev/null 2>&1; then \
