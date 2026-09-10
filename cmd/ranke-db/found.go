@@ -22,9 +22,11 @@ func foundCmd() *cobra.Command {
 		Use:   "found [flags] <configfile>|- <pubkeyfile>",
 		Short: "Found this config's archive under a first contributor's public key, then exit",
 		Long: "Creates the archive a config points at: the sequencer's initial claim, the first\n" +
-			"contributor carrying the given PEM public key, the empty branch table k₀ and its\n" +
-			"bookmark. It never serves. An archive that already exists is reported as such and\n" +
-			"left alone, so provisioning may call this ahead of every launch.\n\n" +
+			"contributor carrying the given PEM public key, and the branch binding it, named by\n" +
+			"sequencer.found.branch. The branch is what makes that contributor reachable, so an\n" +
+			"archive founded without one is an archive nobody can write to.\n\n" +
+			"It never serves. An archive that already exists is reported as such and left alone,\n" +
+			"so provisioning may call this ahead of every launch.\n\n" +
 			"The private half of the founding key never reaches the server: hand over the public\n" +
 			"half and keep the rest with the application that contributes under it.",
 		Args: cobra.ExactArgs(2),
@@ -52,6 +54,7 @@ func foundCmd() *cobra.Command {
 			}
 			out := cmd.OutOrStdout()
 			fmt.Fprintln(out, "archive founded")
+			fmt.Fprintln(out, "  branch:           ", founding.Branch)
 			fmt.Fprintln(out, "  first contributor:", founding.FirstContributor)
 			fmt.Fprintln(out, "  head:             ", founding.Head)
 			fmt.Fprintln(out, "  bookmark:         ", founding.Bookmark)

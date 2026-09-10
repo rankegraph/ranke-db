@@ -182,6 +182,27 @@ export interface Health {
   signer?: string;
 }
 
+export interface Subject {
+  /**
+   * The account the credential resolved to.
+   * @example "webapp"
+   */
+  account: string;
+  /**
+   * The account's grants, each a `RIGHTS glob` spec as the configuration
+   * states it. An account holding none reports an empty array.
+   * @example ["CR foo_*","R $archive"]
+   */
+  grants: string[];
+  /**
+   * Attenuations carried by this credential, narrowing the grants above.
+   * Every caveat must allow a request for it to pass. Empty where the
+   * credential carries none.
+   * @example ["R foo_bar"]
+   */
+  caveats: string[];
+}
+
 export interface StorageLayer {
   name: string;
   /** Adapter type (e.g. memory, filesystem, s3, redis, neo4j). */
@@ -1096,6 +1117,24 @@ export class Api<
       }),
   };
   system = {
+    /**
+     * @description Reports the caller back to itself: the account its credential resolved to, that account's grants, and any caveats attenuating them. It answers about **this server's** access policy, never about the graph, which is why it sits under `/system`. Needs no grant — a caller learns only what it already proved by authenticating, and nothing about any other account. A bad credential is still `401`, so this doubles as the side-effect-free way to check one. `grants` and `caveats` are reported separately rather than intersected: a request is allowed when the account's grants permit it **and** every caveat still does, so seeing both is what explains a refusal. A token narrowed by attenuation has no other way to show what survived.
+     *
+     * @tags system
+     * @name Whoami
+     * @summary What this credential may do
+     * @request GET:/system/whoami
+     * @secure
+     */
+    whoami: (params: RequestParams = {}) =>
+      this.request<Subject, Error>({
+        path: `/system/whoami`,
+        method: "GET",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
     /**
      * @description Lists the stack's storage layers (read-through tiers) by **name and type only** — never connection details or secrets. Naming layers is what lets a verification run target one directly (a read-through view can mask the loss of an object on a deeper layer).
      *

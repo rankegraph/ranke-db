@@ -30,6 +30,8 @@ func (c *Core) execute(ctx context.Context, req *Request) (Stream, error) {
 		// Health answers from the signer alone, never the archive: it is wanted
 		// precisely when the stack is too broken to open one.
 		return c.health(ctx, req)
+	case OpSubjectGet:
+		return c.subject(req)
 	case OpLayerList, OpLayerInfo:
 		return c.layers(req)
 	case OpDevClockAdvance:
@@ -261,6 +263,21 @@ func (c *Core) health(ctx context.Context, req *Request) (Stream, error) {
 	}
 	req.Report.step("health reported")
 	return &jsonStream{value: report}, nil
+}
+
+// subject reports the principal this request authenticated as. Both lists are non-nil,
+// so a caller holding nothing reads an empty array rather than a null.
+func (c *Core) subject(req *Request) (Stream, error) {
+	caveats := make([]string, 0, len(req.Principal.Caveats))
+	for _, g := range req.Principal.Caveats {
+		caveats = append(caveats, g.String())
+	}
+	req.Report.step("subject %q reported", req.Principal.Account)
+	return &jsonStream{value: Subject{
+		Account: req.Principal.Account,
+		Grants:  c.access.Grants(req.Principal.Account),
+		Caveats: caveats,
+	}}, nil
 }
 
 // layers reports what config retained of each layer: a name and a type.

@@ -49,6 +49,7 @@ const (
 	OpLayerList                           // list storage layers (name + type)      (no grant)
 	OpLayerInfo                           // runtime info on one storage layer      (no grant)
 	OpHealthGet                           // liveness                               (no grant)
+	OpSubjectGet                          // the caller's own account and grants    (no grant)
 	OpVerificationStart                   // start a verification run               (no grant — verification needs none)
 	OpVerificationList                    // list verification runs                 (no grant)
 	OpVerificationGet                     // one verification run                   (no grant)

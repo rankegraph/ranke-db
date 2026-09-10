@@ -43,13 +43,17 @@ func TestListBranchesNeedsNoBranchName(t *testing.T) {
 	}
 }
 
-// TestEmptyArchiveListsNothing pins that a fresh instance is explorable: no branches is an
-// empty list, not a failure a client has to special-case.
-func TestEmptyArchiveListsNothing(t *testing.T) {
+// TestFreshArchiveListsItsFoundingBranch pins that a fresh instance is explorable, and
+// that founding leaves something to explore: the branch it bound the first contributor
+// to. An archive with none would be one nobody could write to.
+func TestFreshArchiveListsItsFoundingBranch(t *testing.T) {
 	h, _ := newServingStack(t, everyReadRight)
 	got := listBranches(t, h, http.StatusOK)
-	if len(got.Branches) != 0 {
-		t.Fatalf("branches = %+v, want none on a fresh archive", got.Branches)
+	if len(got.Branches) != 1 || got.Branches[0].Name != "main" {
+		t.Fatalf("branches = %+v, want just the founding branch", got.Branches)
+	}
+	if got.Branches[0].Head == "" {
+		t.Error("the founding branch has no head")
 	}
 }
 
@@ -409,4 +413,61 @@ func signedClaim(t *testing.T, self ranke.Contributor, priv ed25519.PrivateKey, 
 		t.Fatalf("sign %s: %v", typ, err)
 	}
 	return claim
+}
+
+// TestWhoamiNeedsNoGrant is the route's reason to exist: an account holding nothing
+// still learns what it authenticated as, so "why is this 403" is one request rather
+// than a hunt through someone else's configuration.
+func TestWhoamiNeedsNoGrant(t *testing.T) {
+	h, _ := newServingStack(t, []string{})
+
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/system/whoami", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /system/whoami = %d, want 200 for a grantless account: %s", rec.Code, rec.Body)
+	}
+
+	var got struct {
+		Account string   `json:"account"`
+		Grants  []string `json:"grants"`
+		Caveats []string `json:"caveats"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if got.Account == "" {
+		t.Error("account is empty; the caller authenticated as somebody")
+	}
+	// Empty arrays rather than null: a client ranging over them needs no nil check.
+	if got.Grants == nil || got.Caveats == nil {
+		t.Errorf("grants=%v caveats=%v, want empty arrays", got.Grants, got.Caveats)
+	}
+}
+
+// TestWhoamiReportsTheGrantsItHolds pins that the specs come back as configured, so a
+// client can read its own reach rather than probing branch by branch.
+func TestWhoamiReportsTheGrantsItHolds(t *testing.T) {
+	h, _ := newServingStack(t, []string{"CR foo_*", "R $archive"})
+
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/system/whoami", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /system/whoami = %d, want 200: %s", rec.Code, rec.Body)
+	}
+
+	var got struct {
+		Grants []string `json:"grants"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	held := map[string]bool{}
+	for _, g := range got.Grants {
+		held[g] = true
+	}
+	for _, want := range []string{"CR foo_*", "R $archive"} {
+		if !held[want] {
+			t.Errorf("grant %q missing from %v", want, got.Grants)
+		}
+	}
 }

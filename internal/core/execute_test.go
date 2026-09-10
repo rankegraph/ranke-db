@@ -167,7 +167,7 @@ func TestReadArms(t *testing.T) {
 	})
 
 	t.Run("an unknown branch is not found", func(t *testing.T) {
-		_, err := c.Handle(context.Background(), &Request{Op: OpBranchHead, Branch: "no-such-branch"})
+		_, err := c.Handle(context.Background(), &Request{Op: OpBranchHead, Branch: "no_such_branch"})
 		if !errors.Is(err, ErrNotFound) {
 			t.Fatalf("err = %v, want ErrNotFound", err)
 		}
@@ -387,7 +387,7 @@ func foundArchive(t *testing.T, seq sequencer.Sequencer) {
 	if err != nil {
 		t.Fatalf("encode founding key: %v", err)
 	}
-	if _, err := seq.Found(context.Background(), encoded); err != nil {
+	if _, err := seq.Found(context.Background(), encoded, "main"); err != nil {
 		t.Fatalf("found the archive: %v", err)
 	}
 }

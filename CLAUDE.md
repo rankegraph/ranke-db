@@ -13,13 +13,14 @@ here — compose the library.
 ## Library: ranke-go (a versioned GitHub module)
 
 Depend on ranke-go as a normal module: `require github.com/rankegraph/ranke-go vX.Y.Z`,
-bumped via semver. **ranke-go and ranke-ts mirror each other**, so the two pins move together:
-`go.mod`'s ranke-go and `frontend/package.json`'s `@rankegraph/ranke` implement one wire
-format, and bumping only one can leave the explorer computing ids no server agrees with — a
-failure with no build error. Since the move to the `@rankegraph` scope, ranke-ts carries the
-version of the ranke-go it translates, so the two pins share a minor and a divergence is
-visible by reading them side by side — today `ranke-go v0.26.0` against `@rankegraph/ranke
-0.26.1`, the patch levels moving on their own.
+bumped via semver. **ranke-go and ranke-ts mirror each other**: `go.mod`'s ranke-go and
+`frontend/package.json`'s `@rankegraph/ranke` implement one wire format, and a
+disagreement leaves the explorer computing ids no server agrees with — a failure with no
+build error. The two version lines are independent: where they happen to
+align it is coincidence, so neither the numbers nor a reading of them side by side says
+anything about whether the two agree. ranke-ts asserts the agreement itself, testing
+byte for byte against ranke-go; `make -C frontend test` is where that reaches this repo,
+and it is the check after bumping either.
 **NEVER** wire it as a sibling path, `go.work use`, or `replace` — and
 never edit a sibling `ranke-go` checkout. It provides the data model (claims, Universe,
 BranchTableHead, Archive), verification, and the **Storage** + **Sequencer** adapters.
@@ -168,12 +169,27 @@ provides, or removes; rewording does not. Write the entry under `## Unreleased`
 in the same change, and summarise: one entry per change that matters to a
 reader, not a log of every edit it took to get there.
 
+Group the entries under `### Added`, `### Changed`, `### Fixed` and
+`### Removed`, adding a heading only when something goes under it. Name what
+moved: a config key, a flag, a route, a command, a dependency and its version.
+Say what a reader must now do differently, and let a removal name its
+replacement — "`sequencer.history` … replace it with `seed`" tells a reader
+what to edit, where "dropped the history section" leaves them to work it out.
+Where a fix corrects behaviour someone may have relied on, say what the old
+behaviour was, since that is how a reader recognises the bug they hit.
+
 `make release <bump>` stamps that section with the version it cuts, leaves a
 fresh `## Unreleased` behind, and commits it on the branch being released, so
 a version heading is never written by hand. A release whose `## Unreleased`
 section is empty is refused, since it would record nothing. The stamping lives
 in ranke-graph's shared `release-cycle.sh`, which this repo caches under
 `bin/`, and where `CHANGELOG.md` is missing the first release writes it.
+
+A stamped section keeps its group headings, so read the file and find
+`## Unreleased` before writing rather than anchoring an edit on `### Fixed` or
+`### Removed`. A release cut since you last looked leaves those headings inside
+a shipped version, where an entry claims a change that release never carried
+and leaves `## Unreleased` empty — which the next release then refuses.
 
 ## Layout
 

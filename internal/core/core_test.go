@@ -11,7 +11,7 @@ import (
 )
 
 // newTestCore assembles a core with a NoAuth backend authenticating as "ops" and
-// an access policy granting ops read on foo-*. The driven ports are nil: the
+// an access policy granting ops read on foo_*. The driven ports are nil: the
 // pipeline reaches the execute stub, which touches neither.
 func newTestCore(t *testing.T) *Core {
 	t.Helper()
@@ -25,7 +25,7 @@ func newTestCore(t *testing.T) *Core {
 	if err != nil {
 		t.Fatalf("auth.NewSet: %v", err)
 	}
-	chk, err := access.New(map[string][]string{"ops": {"R foo-*"}})
+	chk, err := access.New(map[string][]string{"ops": {"R foo_*"}})
 	if err != nil {
 		t.Fatalf("access.New: %v", err)
 	}
@@ -37,7 +37,7 @@ func newTestCore(t *testing.T) *Core {
 // which here has no archive to open, since the test core binds no ports.
 func TestHandleFlow(t *testing.T) {
 	c := newTestCore(t)
-	req := &Request{Op: OpClaimQuery, Branch: "foo-bar"}
+	req := &Request{Op: OpClaimQuery, Branch: "foo_bar"}
 
 	_, err := c.Handle(context.Background(), req)
 	if !errors.Is(err, ErrNotImplemented) {
@@ -51,7 +51,7 @@ func TestHandleFlow(t *testing.T) {
 	}
 }
 
-// TestHandleForbidden stops the pipeline at authorization: ops holds R on foo-*
+// TestHandleForbidden stops the pipeline at authorization: ops holds R on foo_*
 // only, so a read of bar-baz is forbidden and never reaches execution.
 func TestHandleForbidden(t *testing.T) {
 	c := newTestCore(t)

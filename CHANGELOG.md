@@ -4,6 +4,31 @@ What each release changed for someone depending on this repository.
 
 ## Unreleased
 
+### Changed
+
+- ranke-go v0.30.0. Founding now binds the archive's first contributor to a branch,
+  which is what makes that contributor reachable: `V-ARCHIVEHEIGHT` allows k₀ one
+  reference, so it cannot name the contributor itself. An archive founded without a
+  branch held that claim referenced by nothing, and nobody could ever write to it.
+- `sequencer.founder` becomes the `sequencer.found` section: `found.pubkey` is the
+  first contributor's PEM public key as before, and `found.branch` names the branch
+  the archive begins on. `found.branch` is required whenever an archive is founded,
+  since which branch it starts on is permanent. `ranke-db found` reports it alongside
+  the head and bookmark.
+- A branch name is `[a-z0-9_]` with no leading underscore, which `ranke.ValidateBranchName`
+  now enforces. Grant globs follow the same charset, so `CR foo-*` becomes `CR foo_*`
+  and a grant can no longer name branches that cannot exist. Existing configurations
+  using hyphens in branch names or globs must be rewritten.
+
+### Added
+
+- `GET /system/whoami` reports the caller back to itself: the account its credential
+  resolved to, that account's grants, and any caveats attenuating them. It needs no
+  grant, so an account holding nothing still gets an answer, and a bad credential is
+  still `401`. Grants and caveats come back separately rather than intersected, since
+  a request needs both to allow it — which is the only way to see what survived a
+  macaroon attenuation.
+
 ## v1.20.1 — 2026-09-09
 
 ### Fixed

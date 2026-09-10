@@ -33,6 +33,15 @@ type Health struct {
 	Signer  string `json:"signer,omitempty"` // signing/contributor identity (e.g. "ed25519:…")
 }
 
+// Subject is a caller reported back to itself: what it authenticated as, and what that
+// lets it do here. Grants and caveats stay separate because a request needs both to
+// allow it, so an intersection would hide which half refused.
+type Subject struct {
+	Account string   `json:"account"`
+	Grants  []string `json:"grants"`
+	Caveats []string `json:"caveats"`
+}
+
 // StorageLayer names one storage layer — name and type only, by design.
 type StorageLayer struct {
 	Name string `json:"name"`

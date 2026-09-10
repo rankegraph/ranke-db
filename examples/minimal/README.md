@@ -119,11 +119,16 @@ lists nobody coordinated apart, so a distinctive label serves whenever you own t
 store. Use `"bookmark": "<id>"` instead to reopen a list whose earliest entries were
 lost — any surviving entry carries the seed the whole list shares.
 
-`"founder"` is the PEM **public** key of the archive's first contributor. An archive
-comes into being once, and this is what a launch founds it under; the private half
-stays with whatever application contributes under that identity. Leave `founder` out
-and the launch refuses to serve an archive that does not exist yet, naming what is
-missing — found it by hand instead:
+`"found"` is what a launch brings the archive into being with. `branch` names the
+branch it begins on, and `pubkey` is the PEM **public** key of its first contributor;
+the private half stays with whatever application contributes under that identity.
+
+The branch matters: founding binds the first contributor to it, and that binding is
+what makes the contributor reachable at all. An archive founded without one holds a
+contributor claim nothing references, so nobody can ever write to it.
+
+Leave `found.pubkey` out and the launch refuses to serve an archive that does not
+exist yet, naming what is missing — found it by hand instead:
 
 ```sh
 ranke-db found examples/minimal/config.json first-contributor.pub.pem

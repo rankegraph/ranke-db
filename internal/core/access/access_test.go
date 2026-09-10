@@ -8,7 +8,7 @@ import "testing"
 // denied, and the cross-branch delete rule falls out of per-branch calls.
 func TestAllow(t *testing.T) {
 	c, err := New(map[string][]string{
-		"webapp":      {"CR foo-*"},
+		"webapp":      {"CR foo_*"},
 		"provisioner": {"C $branches"},
 		"backup":      {"R $universe"},
 		"archivist":   {"R $archive"},
@@ -27,9 +27,9 @@ func TestAllow(t *testing.T) {
 		br    string
 		want  bool
 	}{
-		{"contribute within glob", "webapp", Contribute, "foo-bar", true},
-		{"read within glob", "webapp", Read, "foo-bar", true},
-		{"right not granted", "webapp", Update, "foo-bar", false},
+		{"contribute within glob", "webapp", Contribute, "foo_bar", true},
+		{"read within glob", "webapp", Read, "foo_bar", true},
+		{"right not granted", "webapp", Update, "foo_bar", false},
 		{"branch outside glob", "webapp", Read, "bar-baz", false},
 		{"branch-table admin", "provisioner", Contribute, Branches, true},
 		{"privileged universe read", "backup", Read, Universe, true},
@@ -39,7 +39,7 @@ func TestAllow(t *testing.T) {
 		{"ordinary glob misses archive", "wildcard", Read, Archive, false},
 		{"ordinary glob misses sequencer", "wildcard", Read, Sequencer, false},
 		{"ordinary glob matches branch", "wildcard", Read, "anything", true},
-		{"unknown account", "ghost", Read, "foo-bar", false},
+		{"unknown account", "ghost", Read, "foo_bar", false},
 		{"delete on held branch", "deleter", Delete, "a", true},
 		{"delete on other branch", "deleter", Delete, "b", false},
 	}
@@ -54,11 +54,11 @@ func TestAllow(t *testing.T) {
 // TestAllowCaveats covers attenuation: a caveat narrows an account's grants to
 // their intersection, never widens them.
 func TestAllowCaveats(t *testing.T) {
-	c, err := New(map[string][]string{"webapp": {"CR foo-*"}})
+	c, err := New(map[string][]string{"webapp": {"CR foo_*"}})
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
-	attenuated := Principal{Account: "webapp", Caveats: []Grant{mustGrant(t, "R foo-bar")}}
+	attenuated := Principal{Account: "webapp", Caveats: []Grant{mustGrant(t, "R foo_bar")}}
 
 	cases := []struct {
 		name  string
@@ -66,8 +66,8 @@ func TestAllowCaveats(t *testing.T) {
 		br    string
 		want  bool
 	}{
-		{"caveat permits the narrowed read", Read, "foo-bar", true},
-		{"caveat withholds contribute", Contribute, "foo-bar", false},
+		{"caveat permits the narrowed read", Read, "foo_bar", true},
+		{"caveat withholds contribute", Contribute, "foo_bar", false},
 		{"caveat withholds a sibling branch", Read, "foo-qux", false},
 	}
 	for _, tc := range cases {
@@ -77,28 +77,28 @@ func TestAllowCaveats(t *testing.T) {
 	}
 
 	// A caveat cannot grant what the account never held.
-	widen := Principal{Account: "webapp", Caveats: []Grant{mustGrant(t, "D foo-bar")}}
-	if c.Allow(widen, Delete, "foo-bar") {
+	widen := Principal{Account: "webapp", Caveats: []Grant{mustGrant(t, "D foo_bar")}}
+	if c.Allow(widen, Delete, "foo_bar") {
 		t.Fatal("caveat widened the account beyond its grants")
 	}
 }
 
 // TestAllowCaveatsIntersect covers successive attenuation: a bearer holding "R
-// foo-*" narrows further to "R foo-bar" before handing the token on, and the two
+// foo_*" narrows further to "R foo_bar" before handing the token on, and the two
 // caveats must intersect (AND), not union (OR) — otherwise the second narrowing
 // step would hand the recipient back the first caveat's wider authority.
 func TestAllowCaveatsIntersect(t *testing.T) {
-	c, err := New(map[string][]string{"webapp": {"CR foo-*"}})
+	c, err := New(map[string][]string{"webapp": {"CR foo_*"}})
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
 	narrowedTwice := Principal{
 		Account: "webapp",
-		Caveats: []Grant{mustGrant(t, "R foo-*"), mustGrant(t, "R foo-bar")},
+		Caveats: []Grant{mustGrant(t, "R foo_*"), mustGrant(t, "R foo_bar")},
 	}
 
-	if !c.Allow(narrowedTwice, Read, "foo-bar") {
-		t.Fatal("both caveats permit foo-bar, want allowed")
+	if !c.Allow(narrowedTwice, Read, "foo_bar") {
+		t.Fatal("both caveats permit foo_bar, want allowed")
 	}
 	if c.Allow(narrowedTwice, Read, "foo-other") {
 		t.Fatal("second caveat withholds foo-other, want denied — caveats must intersect, not union")
@@ -119,13 +119,14 @@ func mustGrant(t *testing.T, spec string) Grant {
 // names outside the lowercase/digit/'-' alphabet.
 func TestParseGrantRejects(t *testing.T) {
 	bad := map[string]string{
-		"unknown right letter": "CX foo-*",
-		"admin is not a right": "A foo-*",
+		"unknown right letter": "CX foo_*",
+		"admin is not a right": "A foo_*",
 		"missing glob":         "CR",
 		"non-R on universe":    "CR $universe",
 		"unknown reserved":     "R $secret",
 		"uppercase branch":     "R Foo",
-		"underscore branch":    "R foo_bar",
+		"hyphen branch":        "R foo-bar",
+		"leading underscore":   "R _foo",
 		"slash in branch":      "R foo/bar",
 	}
 	for name, spec := range bad {
@@ -133,7 +134,7 @@ func TestParseGrantRejects(t *testing.T) {
 			t.Errorf("%s: want error", name)
 		}
 	}
-	if _, err := New(map[string][]string{"": {"R foo-*"}}); err == nil {
+	if _, err := New(map[string][]string{"": {"R foo_*"}}); err == nil {
 		t.Error("empty account name: want error")
 	}
 }
@@ -149,12 +150,12 @@ func TestParseGrantReserved(t *testing.T) {
 }
 
 // TestPaperAccessExample pins the paper's own example (§Access Control): with
-// `webapp CR foo_*, provisioner C $branches`, provisioner creates branches such as foo-bar
+// `webapp CR foo_*, provisioner C $branches`, provisioner creates branches such as foo_bar
 // and webapp reads and contributes to them. Neither grant confers the other's job, and
 // $branches carries no glob — it is one server-wide surface.
 func TestPaperAccessExample(t *testing.T) {
 	c, err := New(map[string][]string{
-		"webapp":      {"CR foo-*"},
+		"webapp":      {"CR foo_*"},
 		"provisioner": {"C $branches"},
 	})
 	if err != nil {
@@ -169,10 +170,10 @@ func TestPaperAccessExample(t *testing.T) {
 		want  bool
 	}{
 		{"provisioner creates branches", "provisioner", Contribute, Branches, true},
-		{"provisioner does not write foo-bar", "provisioner", Contribute, "foo-bar", false},
-		{"provisioner does not read foo-bar", "provisioner", Read, "foo-bar", false},
-		{"webapp contributes to foo-bar", "webapp", Contribute, "foo-bar", true},
-		{"webapp reads foo-bar", "webapp", Read, "foo-bar", true},
+		{"provisioner does not write foo_bar", "provisioner", Contribute, "foo_bar", false},
+		{"provisioner does not read foo_bar", "provisioner", Read, "foo_bar", false},
+		{"webapp contributes to foo_bar", "webapp", Contribute, "foo_bar", true},
+		{"webapp reads foo_bar", "webapp", Read, "foo_bar", true},
 		{"webapp cannot create a branch", "webapp", Contribute, Branches, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -181,5 +182,38 @@ func TestPaperAccessExample(t *testing.T) {
 				t.Fatalf("Allow(%s, %c, %s) = %v, want %v", tc.acct, tc.right, tc.br, got, tc.want)
 			}
 		})
+	}
+}
+
+// TestGrantStringRoundTrips: whoami reports grants and caveats through String, so what
+// it emits has to be what ParseGrant accepts — otherwise a client reads a spec it could
+// not send back, and an attenuated token reports caveats in a form nothing understands.
+func TestGrantStringRoundTrips(t *testing.T) {
+	for _, spec := range []string{
+		"R foo_bar", "CR foo_*", "CRUD *", "R $universe", "C $branches", "R $archive",
+	} {
+		g, err := ParseGrant(spec)
+		if err != nil {
+			t.Fatalf("ParseGrant(%q): %v", spec, err)
+		}
+		again, err := ParseGrant(g.String())
+		if err != nil {
+			t.Fatalf("ParseGrant(%q.String() = %q): %v", spec, g.String(), err)
+		}
+		if again.String() != g.String() {
+			t.Errorf("%q: round trip gave %q then %q", spec, g.String(), again.String())
+		}
+	}
+}
+
+// TestGrantStringOrdersRightsCRUD: one set of rights has one spelling, so a client
+// comparing what whoami reported against what it configured sees no spurious difference.
+func TestGrantStringOrdersRightsCRUD(t *testing.T) {
+	g, err := ParseGrant("RC foo_bar")
+	if err != nil {
+		t.Fatalf("ParseGrant: %v", err)
+	}
+	if got := g.String(); got != "CR foo_bar" {
+		t.Errorf("String() = %q, want %q", got, "CR foo_bar")
 	}
 }
