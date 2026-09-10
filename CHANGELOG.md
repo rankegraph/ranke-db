@@ -4,6 +4,8 @@ What each release changed for someone depending on this repository.
 
 ## Unreleased
 
+## v1.27.1 — 2026-09-10
+
 ### Changed
 
 - A claim signed under a key that `ranke-client contributor add` admitted carries height 2,
