@@ -5,7 +5,7 @@
 //
 // One binary per role: `ranke-db` operates an instance from its config, this one holds a
 // contributor key and addresses a server already up. A contributor key signs claims into
-// their ids where the server's identity attests the merge, so separate binaries keep two
+// their ids where the server's own key attests the merge, so separate binaries keep two
 // unlike keys apart in use.
 package main
 

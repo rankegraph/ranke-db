@@ -28,10 +28,10 @@ func keyPEM(t *testing.T) string {
 	return string(pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: der}))
 }
 
-// TestLoadYieldsAUsableIdentity covers the seam this package is: keysource reads the
-// bytes, ParseKeypair turns them into an identity carrying the multikey public half a
+// TestLoadYieldsAUsableKeypair covers the seam this package is: keysource reads the
+// bytes, ParseKeypair turns them into a keypair carrying the multikey public half a
 // contributor claim needs. The grammar's own cases are the library's to test.
-func TestLoadYieldsAUsableIdentity(t *testing.T) {
+func TestLoadYieldsAUsableKeypair(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "contributor.pem")
 	if err := os.WriteFile(path, []byte(keyPEM(t)), 0o600); err != nil {
 		t.Fatalf("write: %v", err)

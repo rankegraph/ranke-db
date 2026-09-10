@@ -4,6 +4,33 @@ What each release changed for someone depending on this repository.
 
 ## Unreleased
 
+## v1.26.0 — 2026-09-10
+
+### Changed
+
+- `ranke-client branch create` contributes one claim: the creator's contributor claim,
+  carrying the pubkey and dated when it was added. That brings the branch into being and
+  is what every later claim on it resolves through (`V-SIG`). Each branch gets its own,
+  so no branch references another and the command needs no **R** on `$archive` — a
+  `$`-target no tenant holds. Within a branch the claim is reused rather than added again.
+- `client.NewContributor(keypair)` replaces `client.RegisterContributor`, returning
+  `ranke.Contributor` rather than a wrapper of its own.
+
+### Removed
+
+- `contribution/branch_created`. A branch's creation is recorded by the Sequencer, in the
+  branch-table revision that adds the entry; a client's claim restating it added a second
+  record of the same event. Nothing replaces it — read the branch table
+  (`GET /branches`, or `ranke-client branch list`).
+- `client.Client.ResolveContributor`, `client.Contributor`, `client.RegisterContributor`,
+  and the sentinels `ErrContributorLapsed`, `ErrContributorAmbiguous`,
+  `ErrNoSuchContributor` and `ErrContributorUnresolved`, all from v1.25.0. Resolving a key
+  against the archive was what made a branch reference another branch's contributor. Build
+  the claim with `client.NewContributor`; to see what the archive holds, read
+  `client.Client.Contributors` or run `ranke-client contributor list`.
+- `ranke-client branch create --contributor` and `--register-identity`, both from
+  v1.25.0. Each existed to steer the resolve.
+
 ## v1.25.0 — 2026-09-10
 
 ### Added
