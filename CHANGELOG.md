@@ -4,6 +4,8 @@ What each release changed for someone depending on this repository.
 
 ## Unreleased
 
+## v1.27.0 — 2026-09-10
+
 ### Added
 
 - `ranke-client contributor add <branch> --pubkey <hex|PEM> --signing-key <spec>` admits a
