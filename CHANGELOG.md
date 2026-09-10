@@ -4,6 +4,8 @@ What each release changed for someone depending on this repository.
 
 ## Unreleased
 
+## v1.27.2 — 2026-09-10
+
 ### Changed
 
 - ranke-go moves to v0.33.0, where a claim's height is answered by a resolver:
