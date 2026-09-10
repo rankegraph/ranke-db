@@ -88,8 +88,8 @@ func TestBuildResolvesAndWires(t *testing.T) {
 func TestBuildEndpointAdmits(t *testing.T) {
 	const cfgJSON = `{
 		"accounts": {
-			"webapp": {"grants": ["R proj-*"]},
-			"admin":  {"grants": ["C mgmt-*"]}
+			"webapp": {"grants": ["R proj_*"]},
+			"admin":  {"grants": ["C mgmt_*"]}
 		},
 		"endpoints": [{
 			"transport": {"type": "rest"},
@@ -106,7 +106,7 @@ func TestBuildEndpointAdmits(t *testing.T) {
 		t.Fatalf("buildEndpoint: %v", err)
 	}
 
-	req := &core.Request{Op: core.OpClaimQuery, Branch: "proj-x"}
+	req := &core.Request{Op: core.OpClaimQuery, Branch: "proj_x"}
 	if _, err := cr.Handle(context.Background(), req); !errors.Is(err, core.ErrNotImplemented) {
 		t.Fatalf("Handle = %v, want ErrNotImplemented (authorized, reached execute)", err)
 	}
@@ -121,8 +121,8 @@ func TestBuildEndpointAdmits(t *testing.T) {
 func TestBuildEndpointRejectsUnadmitted(t *testing.T) {
 	const cfgJSON = `{
 		"accounts": {
-			"webapp": {"grants": ["R proj-*"]},
-			"admin":  {"grants": ["C mgmt-*"]}
+			"webapp": {"grants": ["R proj_*"]},
+			"admin":  {"grants": ["C mgmt_*"]}
 		},
 		"endpoints": [{
 			"transport": {"type": "rest"},
@@ -139,7 +139,7 @@ func TestBuildEndpointRejectsUnadmitted(t *testing.T) {
 		t.Fatalf("buildEndpoint: %v", err)
 	}
 
-	req := &core.Request{Op: core.OpClaimQuery, Branch: "proj-x"}
+	req := &core.Request{Op: core.OpClaimQuery, Branch: "proj_x"}
 	if _, err := cr.Handle(context.Background(), req); !errors.Is(err, core.ErrForbidden) {
 		t.Fatalf("Handle = %v, want ErrForbidden (admin authenticates but is not admitted here)", err)
 	}
@@ -153,7 +153,7 @@ func TestBuildEndpointAPIKey(t *testing.T) {
 	const key = "webapp-key-0123456789"
 	sum := sha256.Sum256([]byte(key))
 	cfgJSON := `{
-		"accounts": {"webapp": {"grants": ["R proj-*"]}},
+		"accounts": {"webapp": {"grants": ["R proj_*"]}},
 		"endpoints": [{
 			"transport": {"type": "rest"},
 			"auth":      [{"type": "apikey", "keys": [{"account": "webapp", "sha256": "` + hex.EncodeToString(sum[:]) + `"}]}],
@@ -169,7 +169,7 @@ func TestBuildEndpointAPIKey(t *testing.T) {
 		t.Fatalf("buildEndpoint: %v", err)
 	}
 
-	ok := &core.Request{Op: core.OpClaimQuery, Branch: "proj-x", Credential: auth.Credential{Scheme: "apikey", Token: key}}
+	ok := &core.Request{Op: core.OpClaimQuery, Branch: "proj_x", Credential: auth.Credential{Scheme: "apikey", Token: key}}
 	if _, err := cr.Handle(context.Background(), ok); !errors.Is(err, core.ErrNotImplemented) {
 		t.Fatalf("valid key: Handle = %v, want ErrNotImplemented (authenticated + authorized)", err)
 	}
@@ -177,7 +177,7 @@ func TestBuildEndpointAPIKey(t *testing.T) {
 		t.Fatalf("account = %q, want webapp", ok.Principal.Account)
 	}
 
-	bad := &core.Request{Op: core.OpClaimQuery, Branch: "proj-x", Credential: auth.Credential{Scheme: "apikey", Token: "wrong-key-0123456789"}}
+	bad := &core.Request{Op: core.OpClaimQuery, Branch: "proj_x", Credential: auth.Credential{Scheme: "apikey", Token: "wrong-key-0123456789"}}
 	if _, err := cr.Handle(context.Background(), bad); err == nil || errors.Is(err, core.ErrNotImplemented) {
 		t.Fatalf("wrong key: Handle = %v, want an auth error before authorization", err)
 	}
@@ -187,7 +187,7 @@ func TestBuildEndpointAPIKey(t *testing.T) {
 // through assembly: a malformed sha256 fails the endpoint build.
 func TestBuildEndpointAPIKeyRejectsBadDigest(t *testing.T) {
 	const cfgJSON = `{
-		"accounts": {"webapp": {"grants": ["R proj-*"]}},
+		"accounts": {"webapp": {"grants": ["R proj_*"]}},
 		"endpoints": [{
 			"transport": {"type": "rest"},
 			"auth":      [{"type": "apikey", "keys": [{"account": "webapp", "sha256": "not-hex"}]}],
@@ -221,7 +221,8 @@ func TestDevWiresSteerableClock(t *testing.T) {
 	const cfgJSON = `{
 		"signer": {"type": "inmemory", "key": "env(RANKE_TEST_SIGNER_KEY)"},
 		"storage": {"type": "stack", "layers": [{"type": "mem"}]},
-		"sequencer": {"type": "dev", "seed": "test-archive", "founder": "env(RANKE_TEST_FOUNDER)"}
+		"sequencer": {"type": "dev", "seed": "test-archive",
+			"found": {"pubkey": "env(RANKE_TEST_FOUNDER)", "branch": "main"}}
 	}`
 	app, err := Run(context.Background(), strings.NewReader(cfgJSON), nil, true)
 	if err != nil {
@@ -246,7 +247,7 @@ func TestDevRequiresDevSequencer(t *testing.T) {
 	const cfgJSON = `{
 		"signer": {"type": "inmemory", "key": "env(RANKE_TEST_SIGNER_KEY)"},
 		"storage": {"type": "stack", "layers": [{"type": "mem"}]},
-		"sequencer": {"type": "concurrent", "seed": "test-archive"}
+		"sequencer": {"type": "concurrent", "seed": "test-archive", "found": {"branch": "main"}}
 	}`
 	if _, err := Run(context.Background(), strings.NewReader(cfgJSON), nil, true); err == nil {
 		t.Fatal("dev=true against sequencer.type \"concurrent\": want error, got none")
@@ -265,10 +266,10 @@ func TestVerify(t *testing.T) {
 	if err := Verify(context.Background(), strings.NewReader(`{"nope": {}}`), nil, LevelSyntax); err == nil {
 		t.Fatal("Verify syntax accepted an unknown section")
 	}
-	if err := Verify(context.Background(), strings.NewReader(`{"accounts": {"a": {"grants": ["CX foo-*"]}}}`), nil, LevelSyntax); err == nil {
+	if err := Verify(context.Background(), strings.NewReader(`{"accounts": {"a": {"grants": ["CX foo_*"]}}}`), nil, LevelSyntax); err == nil {
 		t.Fatal("Verify syntax accepted a malformed grant")
 	}
-	const danglingAdmit = `{"accounts": {"webapp": {"grants": ["R proj-*"]}}, "endpoints": [{"transport": {"type": "rest"}, "auth": [], "admit": ["ghost"]}]}`
+	const danglingAdmit = `{"accounts": {"webapp": {"grants": ["R proj_*"]}}, "endpoints": [{"transport": {"type": "rest"}, "auth": [], "admit": ["ghost"]}]}`
 	if err := Verify(context.Background(), strings.NewReader(danglingAdmit), nil, LevelSyntax); err == nil {
 		t.Fatal("Verify syntax accepted an admit naming an undefined account")
 	}

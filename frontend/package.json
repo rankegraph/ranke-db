@@ -11,7 +11,7 @@
     "build:single": "vite build && node scripts/inline.mjs"
   },
   "dependencies": {
-    "@rankegraph/ranke": "0.29.0",
+    "@rankegraph/ranke": "0.30.0",
     "graphology": "^0.26.0",
     "graphology-layout": "^0.6.1",
     "graphology-layout-forceatlas2": "^0.10.1",

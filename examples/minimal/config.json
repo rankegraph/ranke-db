@@ -14,7 +14,10 @@
   "sequencer": {
     "type": "dev",
     "seed": "minimal-example",
-    "founder": "env(RANKE_FOUNDER_PUBKEY)"
+    "found": {
+      "pubkey": "env(RANKE_FOUNDER_PUBKEY)",
+      "branch": "main"
+    }
   },
   "accounts": {
     "ops": {

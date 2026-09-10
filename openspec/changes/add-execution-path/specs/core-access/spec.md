@@ -16,11 +16,11 @@ Deleting a claim held in several branches SHALL require **D** on every branch th
 since a purge removes bytes the others share.
 
 #### Scenario: Creating and writing are separate grants
-- **WHEN** `provisioner C $branches` creates `foo-bar` and `webapp CR foo-*` contributes claims to it
+- **WHEN** `provisioner C $branches` creates `foo_bar` and `webapp CR foo_*` contributes claims to it
 - **THEN** both acts are permitted, neither grant conferring the other
 
 #### Scenario: A contribution that would create a branch needs the table right
-- **WHEN** an account holding only `CR foo-*` contributes to `foo-bar`, which the base does not carry
+- **WHEN** an account holding only `CR foo_*` contributes to `foo_bar`, which the base does not carry
 - **THEN** the contribution is refused, creating the branch being a right it does not hold
 
 #### Scenario: Referencing across branches imports the closure

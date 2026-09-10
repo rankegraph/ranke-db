@@ -5,13 +5,11 @@
 //
 // Access is this deployment's policy: accounts holding CRUD grants over branch globs,
 // declared in config, never in the graph. The checker answers one (principal, right,
-// branch) question, and verifiability never consults it at all.
+// branch) question; verifiability never consults it.
 //
-// The rights are CRUD. What was once a fifth, A for admin, is C on $branches: the branch
-// table is itself a claim, so creating a branch contributes to it. $branches carries no
-// glob, being one server-wide surface, and writing claims into a branch is the separate C on
-// that branch. A caveat is a grant of opposite polarity, and the effective permission is
-// their intersection.
+// A for admin is C on $branches, the branch table being a claim, so creating a branch
+// contributes to it while writing into one is the separate C on that branch. A caveat is
+// a grant of opposite polarity, the effective permission their intersection.
 package access
 
 import (
@@ -42,9 +40,9 @@ const (
 
 var reserved = map[string]bool{Universe: true, Archive: true, Sequencer: true, Branches: true}
 
-// branchGlob is an ordinary branch glob: lowercase, digits, '-', and the '*'/'?'
-// wildcards — branch names are deliberately a small alphabet.
-var branchGlob = regexp.MustCompile(`^[a-z0-9*?-]+$`)
+// branchGlob is the charset ValidateBranchName holds a name to (`R-FIELDS`) plus
+// '*'/'?', aligned so no grant can name a branch that cannot exist.
+var branchGlob = regexp.MustCompile(`^[a-z0-9_*?]+$`)
 
 // rightset is a bitmask over the CRUD rights.
 type rightset uint8
@@ -71,7 +69,7 @@ type Grant struct {
 	glob   string
 }
 
-// ParseGrant parses one "RIGHTS glob" spec ("CR foo-*", "R $universe"), rejecting
+// ParseGrant parses one "RIGHTS glob" spec ("CR foo_*", "R $universe"), rejecting
 // unknown letters, malformed globs, and non-R rights on $universe. Caveats reuse it.
 func ParseGrant(spec string) (Grant, error) {
 	fields := strings.Fields(spec)
@@ -100,11 +98,26 @@ func ParseGrant(spec string) (Grant, error) {
 				return Grant{}, fmt.Errorf("grant %q: only R applies to %s", spec, Universe)
 			}
 		}
+	} else if strings.HasPrefix(glob, "_") {
+		// ValidateBranchName reserves a leading underscore.
+		return Grant{}, fmt.Errorf("grant %q: branch %q may not begin with '_'", spec, glob)
 	} else if !branchGlob.MatchString(glob) {
-		return Grant{}, fmt.Errorf("grant %q: branch %q must be lowercase letters, digits and '-' (with * or ? wildcards)", spec, glob)
+		return Grant{}, fmt.Errorf("grant %q: branch %q must be lowercase letters, digits and '_' (with * or ? wildcards)", spec, glob)
 	}
 
 	return Grant{rights: rs, glob: glob}, nil
+}
+
+// String renders the grant back into the "RIGHTS glob" spec it parsed from, letters in
+// CRUD order so one set of rights has one spelling. ParseGrant accepts what this emits.
+func (g Grant) String() string {
+	var letters strings.Builder
+	for _, r := range []Right{Contribute, Read, Update, Delete} {
+		if b, _ := bit(r); g.rights&b != 0 {
+			letters.WriteByte(byte(r))
+		}
+	}
+	return letters.String() + " " + g.glob
 }
 
 // Allows reports whether this grant carries right and its glob matches branch.
@@ -147,14 +160,23 @@ func New(accounts map[string][]string) (*Checker, error) {
 	return c, nil
 }
 
-// Allow reports whether the principal may exercise right on branch: the account's
-// grants and any caveats must both allow it. Unknown or ungranted is denied.
+// Grants reports the specs held by one account, for a principal asking what it may do.
+// An unknown account holds none, which is what the checker denies on.
+func (c *Checker) Grants(account string) []string {
+	held := c.accounts[account]
+	specs := make([]string, 0, len(held))
+	for _, g := range held {
+		specs = append(specs, g.String())
+	}
+	return specs
+}
+
+// Allow reports whether the principal may exercise right on branch: the account's grants
+// and every caveat must allow it. Unknown or ungranted is denied.
 //
-// Caveats are successive attenuation steps, each a predicate the request must
-// still satisfy — not alternatives, or a second narrowing would fail to narrow.
-// A bearer can always attenuate further before passing a token on, so a flat
-// []Grant can only represent one grant per step: to carry more than one right in
-// a single step, list them on one Grant ("RIGHTS glob"), never as siblings.
+// Caveats are successive attenuations, each a predicate the request must still satisfy,
+// so one Grant carries a whole step's rights ("RIGHTS glob") — siblings would read as
+// alternatives, and a second narrowing would fail to narrow.
 func (c *Checker) Allow(p Principal, right Right, branch string) bool {
 	if !anyAllows(c.accounts[p.Account], right, branch) {
 		return false

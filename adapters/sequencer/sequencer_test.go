@@ -40,16 +40,16 @@ func newSigner(t *testing.T) signer.Signer {
 	return sig
 }
 
-// found brings an archive into being under a throwaway key, returning the claim the
-// Sequencer signed for it. Construction opens a bookmark list and writes nothing, so
-// every case wanting a readable archive comes through here.
+// found brings an archive into being on branch "main" under a throwaway key, returning
+// the claim the Sequencer signed for it. Construction opens a bookmark list and writes
+// nothing, so every case wanting a readable archive comes through here.
 func found(t *testing.T, seq sequencer.Sequencer) ranke.Claim {
 	t.Helper()
 	pub, _, err := ed25519.GenerateKey(rand.Reader)
 	require.NoError(t, err)
 	encoded, err := ranke.EncodePublicKey(pub)
 	require.NoError(t, err)
-	first, err := seq.Found(context.Background(), encoded)
+	first, err := seq.Found(context.Background(), encoded, "main")
 	require.NoError(t, err)
 	return first
 }
@@ -120,10 +120,11 @@ func TestArchiveAwaitsFounding(t *testing.T) {
 	require.NoError(t, err)
 	branches, err := archive.GetBranches(ctx)
 	require.NoError(t, err)
-	require.Empty(t, branches, "a founded archive names no branches yet")
-	require.NotEmpty(t, archive.Head(), "but it does have a head: the empty branch table")
+	require.Len(t, branches, 1, "founding binds the first contributor to a branch")
+	require.Equal(t, "main", branches[0].Name())
+	require.NotEmpty(t, archive.Head())
 
-	_, err = seq.Found(ctx, []byte("another key"))
+	_, err = seq.Found(ctx, []byte("another key"), "main")
 	require.Error(t, err, "an archive is founded once")
 }
 

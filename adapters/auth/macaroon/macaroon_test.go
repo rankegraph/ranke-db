@@ -43,14 +43,14 @@ func TestValidMacaroonResolvesToItsAccount(t *testing.T) {
 // translation lands.
 func TestCaveatNarrowsToOneBranch(t *testing.T) {
 	a := newAuth(t)
-	token := macaroontest.Mint(t, macaroontest.RootKey, "webapp", "R foo-bar")
+	token := macaroontest.Mint(t, macaroontest.RootKey, "webapp", "R foo_bar")
 
 	p, err := a.Authenticate(context.Background(), token)
 	if err != nil {
 		t.Fatalf("Authenticate: %v", err)
 	}
-	if len(p.Caveats) != 1 || !p.Caveats[0].Allows('R', "foo-bar") || p.Caveats[0].Allows('C', "foo-bar") {
-		t.Fatalf("caveats=%v, want exactly one Grant('R foo-bar')", p.Caveats)
+	if len(p.Caveats) != 1 || !p.Caveats[0].Allows('R', "foo_bar") || p.Caveats[0].Allows('C', "foo_bar") {
+		t.Fatalf("caveats=%v, want exactly one Grant('R foo_bar')", p.Caveats)
 	}
 }
 
@@ -62,12 +62,12 @@ func TestCaveatNarrowsToOneBranch(t *testing.T) {
 // still has to fool the signature.
 func TestAttemptedWideningIsRefused(t *testing.T) {
 	a := newAuth(t)
-	token := macaroontest.Mint(t, macaroontest.RootKey, "webapp", "R foo-bar")
+	token := macaroontest.Mint(t, macaroontest.RootKey, "webapp", "R foo_bar")
 	raw, err := base64.RawURLEncoding.DecodeString(token)
 	if err != nil {
 		t.Fatalf("decoding fixture: %v", err)
 	}
-	widened := bytes.Replace(raw, []byte("R foo-bar"), []byte("D foo-bar"), 1)
+	widened := bytes.Replace(raw, []byte("R foo_bar"), []byte("D foo_bar"), 1)
 	if bytes.Equal(raw, widened) {
 		t.Fatal("fixture did not contain the caveat condition verbatim — test is not exercising anything")
 	}

@@ -139,6 +139,7 @@ func logFounding(app *config.App) {
 		return
 	}
 	slog.Info("ranke-db founded a new archive",
+		"branch", app.Founded.Branch,
 		"first_contributor", app.Founded.FirstContributor,
 		"head", app.Founded.Head,
 		"bookmark", app.Founded.Bookmark)

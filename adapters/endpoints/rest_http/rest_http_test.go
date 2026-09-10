@@ -643,7 +643,7 @@ func foundArchive(t *testing.T, seq sequencer.Sequencer) {
 	if err != nil {
 		t.Fatalf("encode founding key: %v", err)
 	}
-	if _, err := seq.Found(context.Background(), encoded); err != nil {
+	if _, err := seq.Found(context.Background(), encoded, "main"); err != nil {
 		t.Fatalf("found the archive: %v", err)
 	}
 }

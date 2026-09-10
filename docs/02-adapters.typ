@@ -141,10 +141,11 @@ stood.
   `seed`, and one of the two is required.
 ]
 
-#item("founder")[
-  The PEM public key of the archive's first #gls("contributor"), under which a
-  launch founds an archive that does not exist yet. Optional: leaving it out
-  means founding by hand instead.
+#item("found")[
+  What a launch founds an archive with, when none exists yet. `branch` names the
+  branch the archive begins on, required. `pubkey` is the PEM public key of its
+  first #gls("contributor"), optional: leaving it out means founding by hand
+  instead.
 ]
 
 A seed is a name, not a secret. Its entropy keeps lists that nobody coordinated
@@ -170,7 +171,7 @@ replicates the list to every shard, so it needs all of them to.
 "sequencer": {
   "type": "concurrent",
   "seed": "production-archive",
-  "founder": "env(RANKE_FOUNDER_PUBKEY)"
+  "found": {"pubkey": "env(RANKE_FOUNDER_PUBKEY)", "branch": "main"}
 }
 ```
 ]
@@ -181,10 +182,15 @@ replicates the list to every shard, so it needs all of them to.
 An archive comes into being once. A sequencer whose #gls("bookmark") list is
 empty holds no archive yet and refuses every read and every write until one is
 founded, which writes the sequencer's own initial claim, the first
-#gls("contributor") under it, the empty #gls("branch-table") and its first
-bookmark.
+#gls("contributor") under it, the empty #gls("branch-table"), and a second table
+binding the named #gls("branch") to that contributor.
 
-A launch resolves that state before it serves. With `founder` set it founds and
+The branch is what makes the first contributor reachable: `V-ARCHIVEHEIGHT`
+allows k₀ one reference, so it cannot name the contributor itself. An archive
+founded without a branch would hold that claim in the #gls("universe")
+referenced by nothing, leaving an archive nobody can ever write to.
+
+A launch resolves that state before it serves. With `found.pubkey` set it founds and
 carries on, reporting the first contributor, the head and the bookmark in its
 log. Without it the launch refuses, naming what is missing, rather than serving
 an archive that is not there.

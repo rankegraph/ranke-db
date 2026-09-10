@@ -670,6 +670,39 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '501':
           $ref: '#/components/responses/NotImplemented'
+  /system/whoami:
+    get:
+      operationId: whoami
+      summary: What this credential may do
+      description: |
+        Reports the caller back to itself: the account its credential resolved to,
+        that account's grants, and any caveats attenuating them. It answers about
+        **this server's** access policy, never about the graph, which is why it sits
+        under `/system`.
+
+        Needs no grant — a caller learns only what it already proved by
+        authenticating, and nothing about any other account. A bad credential is
+        still `401`, so this doubles as the side-effect-free way to check one.
+
+        `grants` and `caveats` are reported separately rather than intersected: a
+        request is allowed when the account's grants permit it **and** every caveat
+        still does, so seeing both is what explains a refusal. A token narrowed by
+        attenuation has no other way to show what survived.
+      tags:
+        - system
+      responses:
+        '200':
+          description: The caller's own access.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Subject'
+        '401':
+          description: The credential did not authenticate.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /system/layers:
     get:
       operationId: listStorageLayers
@@ -1171,6 +1204,37 @@ components:
           type: string
           description: The contributor identity this stack signs merges with.
           example: did:key:z6Mk...
+    Subject:
+      type: object
+      required:
+        - account
+        - grants
+        - caveats
+      properties:
+        account:
+          type: string
+          description: The account the credential resolved to.
+          example: webapp
+        grants:
+          type: array
+          description: |
+            The account's grants, each a `RIGHTS glob` spec as the configuration
+            states it. An account holding none reports an empty array.
+          items:
+            type: string
+          example:
+            - CR foo_*
+            - R $archive
+        caveats:
+          type: array
+          description: |
+            Attenuations carried by this credential, narrowing the grants above.
+            Every caveat must allow a request for it to pass. Empty where the
+            credential carries none.
+          items:
+            type: string
+          example:
+            - R foo_bar
     StorageLayer:
       type: object
       required:

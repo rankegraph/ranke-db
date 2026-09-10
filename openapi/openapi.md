@@ -948,6 +948,55 @@ To perform this operation, you must be authenticated by means of one of the foll
 None, jwt, apikey, macaroon
 </aside>
 
+## What this credential may do
+
+<a id="opIdwhoami"></a>
+
+`GET /system/whoami`
+
+Reports the caller back to itself: the account its credential resolved to,
+that account's grants, and any caveats attenuating them. It answers about
+**this server's** access policy, never about the graph, which is why it sits
+under `/system`.
+
+Needs no grant — a caller learns only what it already proved by
+authenticating, and nothing about any other account. A bad credential is
+still `401`, so this doubles as the side-effect-free way to check one.
+
+`grants` and `caveats` are reported separately rather than intersected: a
+request is allowed when the account's grants permit it **and** every caveat
+still does, so seeing both is what explains a refusal. A token narrowed by
+attenuation has no other way to show what survived.
+
+> Example responses
+
+> 200 Response
+
+```json
+{
+  "account": "webapp",
+  "grants": [
+    "CR foo_*",
+    "R $archive"
+  ],
+  "caveats": [
+    "R foo_bar"
+  ]
+}
+```
+
+<h3 id="what-this-credential-may-do-responses">Responses</h3>
+
+|Status|Meaning|Description|Schema|
+|---|---|---|---|
+|200|[OK](https://tools.ietf.org/html/rfc7231#section-6.3.1)|The caller's own access.|[Subject](#schemasubject)|
+|401|[Unauthorized](https://tools.ietf.org/html/rfc7235#section-3.1)|The credential did not authenticate.|[Error](#schemaerror)|
+
+<aside class="warning">
+To perform this operation, you must be authenticated by means of one of the following methods:
+None, jwt, apikey, macaroon
+</aside>
+
 ## List storage layers
 
 <a id="opIdlistStorageLayers"></a>
@@ -1776,6 +1825,35 @@ and what it already held.
 |status|string|true|none|none|
 |version|string|true|none|The server build answering this request. A release names itself exactly;<br>a build from a checkout names its revision, marked when the tree carried<br>uncommitted changes.|
 |signer|string|false|none|The contributor identity this stack signs merges with.|
+
+<h2 id="tocS_Subject">Subject</h2>
+<!-- backwards compatibility -->
+<a id="schemasubject"></a>
+<a id="schema_Subject"></a>
+<a id="tocSsubject"></a>
+<a id="tocssubject"></a>
+
+```json
+{
+  "account": "webapp",
+  "grants": [
+    "CR foo_*",
+    "R $archive"
+  ],
+  "caveats": [
+    "R foo_bar"
+  ]
+}
+
+```
+
+### Properties
+
+|Name|Type|Required|Restrictions|Description|
+|---|---|---|---|---|
+|account|string|true|none|The account the credential resolved to.|
+|grants|[string]|true|none|The account's grants, each a `RIGHTS glob` spec as the configuration<br>states it. An account holding none reports an empty array.|
+|caveats|[string]|true|none|Attenuations carried by this credential, narrowing the grants above.<br>Every caveat must allow a request for it to pass. Empty where the<br>credential carries none.|
 
 <h2 id="tocS_StorageLayer">StorageLayer</h2>
 <!-- backwards compatibility -->

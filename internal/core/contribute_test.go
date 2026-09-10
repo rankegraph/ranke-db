@@ -193,7 +193,7 @@ func writeContribution(t *testing.T, branch string, claims ...ranke.Claim) []byt
 // header, so the test only passes if nothing beyond it was consumed.
 func TestContributeAuthorizesTheDeclarationBeforeReading(t *testing.T) {
 	c := newStack(t)
-	chk, err := access.New(map[string][]string{"ops": {"CR foo-*"}})
+	chk, err := access.New(map[string][]string{"ops": {"CR foo_*"}})
 	if err != nil {
 		t.Fatalf("access.New: %v", err)
 	}

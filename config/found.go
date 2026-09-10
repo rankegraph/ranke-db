@@ -18,6 +18,7 @@ import (
 	"github.com/rankegraph/ranke-go"
 
 	"github.com/rankegraph/ranke-db/adapters/sequencer"
+	"github.com/rankegraph/ranke-db/config/scope"
 )
 
 // ErrAlreadyFounded reports an archive that needs no founding. `ranke-db found` answers
@@ -32,10 +33,14 @@ type Founding struct {
 	Head ranke.Id
 	// Bookmark is the entry in 𝒰_hist the archive can be reopened from.
 	Bookmark ranke.Id
+	// Branch is the branch founding bound the first contributor to.
+	Branch string
 }
 
 // Found assembles the stack from cfg and founds its archive under pubkeyPEM, the first
 // contributor's public key, returning as soon as the archive exists. It never serves.
+// The branch comes from sequencer.found.branch: which branch an archive begins on is
+// permanent, so it belongs in the launch artifact rather than in a caller's argument.
 func Found(ctx context.Context, cfg io.Reader, pass PassphraseSource, pubkeyPEM []byte) (*Founding, error) {
 	c, err := decode(cfg, pass)
 	if err != nil {
@@ -51,7 +56,11 @@ func Found(ctx context.Context, cfg io.Reader, pass PassphraseSource, pubkeyPEM 
 	if !app.Sequencer.InGenesis() {
 		return nil, ErrAlreadyFounded
 	}
-	return foundWith(ctx, app.Sequencer, pubkeyPEM)
+	branch, err := foundingBranch(ctx, c.section(c.Sequencer))
+	if err != nil {
+		return nil, err
+	}
+	return foundWith(ctx, app.Sequencer, pubkeyPEM, branch)
 }
 
 // foundIfConfigured resolves the genesis state of a launch. Refusing beats coming up
@@ -62,16 +71,21 @@ func (c *Config) foundIfConfigured(ctx context.Context, app *App) error {
 		return nil
 	}
 	sec := c.section(c.Sequencer)
-	if !sec.HasValue("founder") {
+	found := sec.GetSection("found")
+	if !found.HasValue("pubkey") {
 		return errors.New("config: this archive has no first contributor yet: " +
-			"set sequencer.founder to its PEM public key, " +
+			"set sequencer.found.pubkey to its PEM public key, " +
 			"or found it once with \"ranke-db found <config> <pubkey.pem>\"")
 	}
-	raw, err := sec.Get(ctx, "founder")
+	raw, err := found.Get(ctx, "pubkey")
 	if err != nil {
-		return fmt.Errorf("config: sequencer.founder: %w", err)
+		return fmt.Errorf("config: sequencer.found.pubkey: %w", err)
 	}
-	founding, err := foundWith(ctx, app.Sequencer, []byte(raw))
+	branch, err := foundingBranch(ctx, sec)
+	if err != nil {
+		return err
+	}
+	founding, err := foundWith(ctx, app.Sequencer, []byte(raw), branch)
 	if err != nil {
 		return err
 	}
@@ -79,13 +93,33 @@ func (c *Config) foundIfConfigured(ctx context.Context, app *App) error {
 	return nil
 }
 
+// foundingBranch reads the branch an archive begins on. Founding binds the first
+// contributor to it, which is what makes that contributor reachable at all: k₀ takes
+// one reference (`V-ARCHIVEHEIGHT`) and cannot name it, so an archive founded without a
+// branch is one nobody can write to.
+func foundingBranch(ctx context.Context, sec scope.Section) (string, error) {
+	found := sec.GetSection("found")
+	if !found.HasValue("branch") {
+		return "", errors.New("config: sequencer.found.branch is required: " +
+			"founding binds the first contributor to a branch, and which one is permanent")
+	}
+	branch, err := found.Get(ctx, "branch")
+	if err != nil {
+		return "", fmt.Errorf("config: sequencer.found.branch: %w", err)
+	}
+	if err := ranke.ValidateBranchName(branch); err != nil {
+		return "", fmt.Errorf("config: sequencer.found.branch: %w", err)
+	}
+	return branch, nil
+}
+
 // foundWith founds seq under the PEM public key.
-func foundWith(ctx context.Context, seq sequencer.Sequencer, pubkeyPEM []byte) (*Founding, error) {
+func foundWith(ctx context.Context, seq sequencer.Sequencer, pubkeyPEM []byte, branch string) (*Founding, error) {
 	pubkey, err := encodePubkey(pubkeyPEM)
 	if err != nil {
 		return nil, err
 	}
-	first, err := seq.Found(ctx, pubkey)
+	first, err := seq.Found(ctx, pubkey, branch)
 	if err != nil {
 		return nil, fmt.Errorf("config: found the archive: %w", err)
 	}
@@ -97,6 +131,7 @@ func foundWith(ctx context.Context, seq sequencer.Sequencer, pubkeyPEM []byte) (
 		FirstContributor: first.ID(),
 		Head:             archive.Head(),
 		Bookmark:         seq.BookmarkId(),
+		Branch:           branch,
 	}, nil
 }
 
