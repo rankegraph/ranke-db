@@ -4,6 +4,8 @@ What each release changed for someone depending on this repository.
 
 ## Unreleased
 
+## v1.23.0 — 2026-09-10
+
 ### Added
 
 - Every binary carries a `version` subcommand — `ranke-db version`, `ranke-client
