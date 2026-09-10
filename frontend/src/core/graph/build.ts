@@ -18,6 +18,7 @@ import {
   matchTypeList,
 } from '@rankegraph/ranke';
 import type { DrawnClaim } from '../claims.ts';
+import type { Claim } from '@rankegraph/ranke';
 import { rememberContent } from '../content.ts';
 import { hashString } from '../hash.ts';
 import type { MockArchive } from '../mock/model.ts';
@@ -301,6 +302,9 @@ function addNodes(
             // As stored, precision included — the ms number above is the layout's.
             createdAtIso: claim.createdAt,
             height: claim.height,
+            // What the claim states, against what is drawn: a partly-read list is not a
+            // complete one, and the difference is only visible if the total travels.
+            references: claim.edges.length,
             contentSize: contentSize(claim.content),
             encoding: contentEncoding(claim.content),
             contentKind: claim.content.kind,
@@ -328,38 +332,98 @@ function addEdges(
   const drop = opts.dropEdgeTypes ?? [];
   const attrs = opts.attrs ?? 'full';
   let addedEdges = 0;
-  let danglingRefs = 0;
   for (const { claim } of claims) {
     for (const edge of claim.edges) {
       // Matched by the library's glob rules, which are the contract's: `contribution/*`
       // names a class, a `*` never crosses the `/`, and a leading `-` re-admits.
       if (drop.length > 0 && matchTypeList(drop, edge.type)) continue;
       if (!graph.hasNode(edge.reference)) {
-        danglingRefs++;
+        // Held, not dropped: a later read supplies the target, and a reference discarded here
+        // would draw the claim that stated it as an initial claim.
+        hold(edge.reference, claim.id, edge);
         continue;
       }
-      const before = graph.size;
-      graph.mergeDirectedEdge(
-        claim.id,
-        edge.reference,
-        attrs === 'lean'
-          ? { claimType: edge.type }
-          : {
-              claimType: edge.type,
-              color: colorFor(edge.typeClass, edge.typeSub, lightnessScaleFor(edge.typeClass, EDGE_LIGHTNESS_SCALE)),
-              contentSize: contentSize(edge.content),
-              encoding: contentEncoding(edge.content),
-              contentKind: edge.content.kind,
-              contentHash: edge.content.kind === 'external' ? edge.content.hash : '',
-              fields: fieldsOf(edge.fields),
-              // RelationFrom (+1) or RelationTo (-1) on relation/*, 0 elsewhere (§4.7).
-              direction: edge.relationDirection,
-            },
-      );
-      if (graph.size > before) addedEdges++;
+      if (mergeEdge(graph, claim.id, edge, attrs)) addedEdges++;
     }
   }
-  return { addedEdges, danglingRefs };
+  addedEdges += drainPending(graph, claims, attrs);
+  return { addedEdges, danglingRefs: pendingCount() };
+}
+
+/** One claim's reference, as the library states it — derived, never a second declaration. */
+type DrawnEdge = Claim['edges'][number];
+
+/** Which attributes an edge carries: the full profile a pane reads, or the type a reducer needs. */
+type AttrProfile = NonNullable<BuildOptions['attrs']>;
+
+/** mergeEdge writes one reference, answering whether it added an edge rather than merging one. */
+function mergeEdge(graph: DirectedGraph, from: string, edge: DrawnEdge, attrs: AttrProfile): boolean {
+  const before = graph.size;
+  graph.mergeDirectedEdge(
+    from,
+    edge.reference,
+    attrs === 'lean'
+      ? { claimType: edge.type }
+      : {
+          claimType: edge.type,
+          color: colorFor(edge.typeClass, edge.typeSub, lightnessScaleFor(edge.typeClass, EDGE_LIGHTNESS_SCALE)),
+          contentSize: contentSize(edge.content),
+          encoding: contentEncoding(edge.content),
+          contentKind: edge.content.kind,
+          contentHash: edge.content.kind === 'external' ? edge.content.hash : '',
+          fields: fieldsOf(edge.fields),
+          // RelationFrom (+1) or RelationTo (-1) on relation/*, 0 elsewhere (§4.7).
+          direction: edge.relationDirection,
+        },
+  );
+  return graph.size > before;
+}
+
+/**
+ * References waiting on a target no read has supplied yet, keyed by that target. Bounded by
+ * the frontier of what has been read, which is small beside the graph.
+ */
+const pending = new Map<string, { from: string; edge: DrawnEdge }[]>();
+
+/**
+ * hold keeps a reference whose target is absent, to be merged when that target arrives. One
+ * entry per (source, type): a page carrying claims already merged re-walks their references,
+ * and holding each again would inflate the count the shortfall reports.
+ */
+function hold(target: string, from: string, edge: DrawnEdge): void {
+  const waiting = pending.get(target);
+  if (!waiting) {
+    pending.set(target, [{ from, edge }]);
+    return;
+  }
+  if (waiting.some((w) => w.from === from && w.edge.type === edge.type)) return;
+  waiting.push({ from, edge });
+}
+
+/** drainPending merges the references that were waiting on the claims this merge just added. */
+function drainPending(graph: DirectedGraph, claims: DrawnClaim[], attrs: AttrProfile): number {
+  let added = 0;
+  for (const { claim } of claims) {
+    const waiting = pending.get(claim.id);
+    if (!waiting) continue;
+    pending.delete(claim.id);
+    for (const { from, edge } of waiting) {
+      if (graph.hasNode(from) && mergeEdge(graph, from, edge, attrs)) added++;
+    }
+  }
+  return added;
+}
+
+/** pendingCount is how many references are still waiting on a target — an unread frontier. */
+export function pendingCount(): number {
+  let n = 0;
+  for (const waiting of pending.values()) n += waiting.length;
+  return n;
+}
+
+/** forgetPending clears the held references, alongside the graph they belong to. */
+export function forgetPending(): void {
+  pending.clear();
 }
 
 export interface BuildResult {

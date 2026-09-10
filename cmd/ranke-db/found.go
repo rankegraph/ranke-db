@@ -1,4 +1,4 @@
-// package: main / cmd
+// package: ranke-db / cmd
 // type:    entrypoint
 // job:     `ranke-db found` — bring a config's archive into being, once, then exit
 // limits:  CLI wiring; the founding is config's (-> config)

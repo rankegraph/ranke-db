@@ -1,4 +1,4 @@
-// package: main / cmd
+// package: ranke-db / cmd
 // type:    entrypoint
 // job:     the ranke-db binary — a cobra CLI handing a config to the config package
 // limits:  CLI wiring only; decrypt/parse/resolve/assemble live in config (-> config)

@@ -13,9 +13,11 @@
 
 import { useEffect } from 'react';
 import { shortId } from '../../core/claims.ts';
-import { claimDetail, fetchContent, openClaimCbor } from '../../core/session.ts';
+import { fetchContent, openClaimCbor } from '../../core/session.ts';
+import { claimDetail } from '../../core/detail.ts';
+import { openClaimProvenance } from '../../core/provenance.ts';
 import { CONTENT_LIMIT } from '../../core/data/source.ts';
-import type { Reference } from '../../core/session.ts';
+import type { Reference } from '../../core/detail.ts';
 import { useExplorer } from '../../core/store.ts';
 import { revealClaim } from '../../render/renderer.ts';
 import { Button, Empty, ExtensionFields, KeyValue, PaneTitle } from '../components/Field.tsx';
@@ -159,7 +161,7 @@ export function SelectionPane() {
               ][])
             : []),
           ['degree', detail.degree.toLocaleString('en-US')],
-          ['referenced by', detail.citedBy.toLocaleString('en-US')],
+          ['referenced by', detail.referencedByCount.toLocaleString('en-US')],
         ]}
       />
 
@@ -167,6 +169,7 @@ export function SelectionPane() {
 
       <div className="row">
         <Button onClick={() => openClaimCbor(detail.id)}>show claim CBOR</Button>
+        <Button onClick={() => void openClaimProvenance(detail.id)}>show claim provenance</Button>
       </div>
 
       <ContentBlock />
@@ -176,14 +179,28 @@ export function SelectionPane() {
         What this claim references — its own edges. Both halves of a row are things to ask about: the
         edge on the left, the claim it points at on the right.
       </p>
-      <RefList rows={detail.references} arrow="→" empty="An initial node — it references nothing." />
+      {detail.statedReferences !== undefined && detail.statedReferences > detail.references.length && (
+        <p className="note">
+          {detail.references.length} of {detail.statedReferences} read — the rest point at claims
+          this session has not loaded.
+        </p>
+      )}
+      <RefList
+        rows={detail.references}
+        arrow="→"
+        empty={
+          detail.height === 0
+            ? 'An initial claim — it references nothing, and its provenance ends here.'
+            : 'Its references have not been read yet — this is where the session stops, not the derivation.'
+        }
+      />
 
       <h2>referenced by</h2>
       <p className="note">
         What references this claim — edges belonging to other claims, drawn in pink while this one
         is selected. A claim cannot know them when it is written, so they accrue.
       </p>
-      <RefList rows={detail.citations} arrow="←" empty="Nothing loaded references this claim." />
+      <RefList rows={detail.referencedBy} arrow="←" empty="Nothing loaded references this claim." />
     </div>
   );
 }

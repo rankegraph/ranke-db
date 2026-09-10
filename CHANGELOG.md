@@ -4,6 +4,42 @@ What each release changed for someone depending on this repository.
 
 ## Unreleased
 
+### Added
+
+- The explorer draws a claim's provenance: **show claim provenance** in the selection pane opens
+  the closure rooted at that claim in its own graph view, with the canvas, layouts, camera and
+  lens every other view uses. One view per claim; asking again brings it forward. A provenance
+  scope is read within the branch the claim was reached through, through the identities-only
+  query a branch scope already sends — no new route and no server change.
+
+### Changed
+
+- A `Scope` carries `branch`, the scope a query names to read it (`select.branch`, `R-QSCOPE`),
+  beside the head whose closure it is. A branch and `$archive` are read within themselves; a
+  claim's provenance within the branch it was reached through. Code building a `Scope` literal
+  must supply it.
+- Scope membership is keyed by head rather than by scope name, a head being what identifies a
+  closure. A branch whose head has advanced now misses the cache rather than reusing the answer
+  for the head it had.
+
+### Fixed
+
+- A reference whose target had not been read was discarded, so the claim that stated it drew as
+  an initial claim — a claim with no references, where the archive says otherwise. Such
+  references are now held and drawn when a later read supplies the target, and the number still
+  waiting is reported rather than counted and thrown away.
+- A read stopped at its result cap was recorded as a scope's whole membership, confining the
+  view to a boundary the archive does not have. A capped read now records nothing, and an
+  unasked scope already admits everything.
+- The selection pane called a claim with no references drawn an initial claim, whether or not
+  its references had been read. It now distinguishes the two by height, which an initial claim
+  carries as 0, and says "1 of 3 read" where a claim's reference list is only partly loaded.
+- `make verify` failed `check-tools` on a fresh checkout with "TYPST_VERSION is not fetched
+  yet", even with network reachable: `verify`'s `generate` prerequisite ran `check-tools`
+  before `docs-pdf`'s `docs-current` had fetched `docs/papers/TYPST_VERSION`, the file
+  `check-tools` reads the pin from. `check-tools` now depends on `docs-current` directly, so
+  the pin is on disk before it is read.
+
 ## v1.27.2 — 2026-09-10
 
 ### Changed

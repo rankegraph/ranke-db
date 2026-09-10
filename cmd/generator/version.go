@@ -1,4 +1,4 @@
-// package: main / cmd
+// package: generator / cmd
 // type:    entrypoint
 // job:     `generator version` — print this build's version
 // limits:  CLI wiring; the value is internal/version's (-> internal/version)

@@ -95,6 +95,42 @@ contribution edges — would drop a relation's participants, which are reachable
 part of the closure. `R-QSTEPS`'s `edges` glob makes such a filter available later as a view
 option; it is not what provenance means.
 
+### Membership keys on the head, not the scope name
+
+`setMembers` keys an id set by scope name (`members.ts:15`). A name identifies a branch; it
+does not identify a closure. Two provenance scopes read within one branch carry that
+branch's name, so keying by name would hand each the other's membership. The key becomes the
+head, which is unique per closure and is already what a scope means.
+
+One consequence is worth stating, since it changes existing behaviour: a branch whose head
+has advanced now misses the cache rather than reusing the answer for the head it had. That
+was arguably a bug before — the old key returned a moved branch's previous closure.
+
+The same rekeying exposes a second: `load` records the claims a read returned as that scope's
+membership (`session.ts:161-163`). Where the read hit its result cap that set is a
+truncation, and remembering it as the closure would make the view state a boundary the
+archive does not have. Membership is left unasked there, which already admits everything.
+
+### The scope picker does not retarget a view it does not govern
+
+`selectScope` patches the active view's scope unconditionally (`session.ts:253`), and the
+header picker calls it on every change (`Header.tsx:134`). With a provenance view active that
+silently converts it into a branch view — the tab still named for the claim, the graph no
+longer its closure. The picker is worse than stale here: `scopeOptions` builds its entries
+from the discovered branch listing, which a provenance scope is never in, so `value={selected}`
+matches no option at all.
+
+So `selectScope` gains the test it was missing — it retargets the active view only where that
+view is branch-scoped, and always updates the session's branch, which is what the next read is
+generated from — and `scopeOptions` describes the active view's scope when that scope is not
+one of the listed branches.
+
+*Converting the view instead* was rejected: the view is keyed on the claim id so a second
+request can bring the tab forward, and a converted view would keep that key while no longer
+showing that claim's provenance, so the next request would surface a branch view. *Disabling
+the picker* was rejected too — it also sets the branch for the next read, which a reader may
+well want to change while reading provenance.
+
 ## Risks / Trade-offs
 
 - **A head claim's closure is the branch.** Anchoring on a `contribution/head` claim asks for

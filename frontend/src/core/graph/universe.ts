@@ -11,7 +11,14 @@
 
 import { DirectedGraph } from 'graphology';
 import type { DrawnClaim } from '../claims.ts';
-import { CLASS_COLOR, CLASS_SIZE, addClaims, addClaimsProgressively } from './build.ts';
+import {
+  CLASS_COLOR,
+  CLASS_SIZE,
+  addClaims,
+  addClaimsProgressively,
+  forgetPending,
+  pendingCount,
+} from './build.ts';
 import type { ProgressReport } from './build.ts';
 
 /** The single graphology instance the renderer reads from. */
@@ -66,7 +73,22 @@ export async function mergeClaimsProgressively(
 /** clear empties the union — a session reset, not something a query does. */
 export function clear(): void {
   universe.clear();
+  forgetPending();
   contributions = 0;
+}
+
+/**
+ * mergeMore folds claims in without any of what `load` does around a read — no relayout, no
+ * reframe, no lens drop, no time axis rebuilt. What a view already draws stays where it is,
+ * which is what lets a closure be read a piece at a time.
+ */
+export function mergeMore(claims: DrawnClaim[]): MergeResult {
+  return addClaims(universe, claims);
+}
+
+/** unreadRefs is how many references still wait on a target no read has supplied. */
+export function unreadRefs(): number {
+  return pendingCount();
 }
 
 export { CLASS_COLOR, CLASS_SIZE };

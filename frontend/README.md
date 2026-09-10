@@ -89,6 +89,23 @@ A scope's answer can name claims this session never read — the archive advance
 load was capped — so the count is reported next to the picker rather than the overlap being
 drawn silently.
 
+**A claim's provenance is a scope too.** Its closure has a root — the claim — so it is
+browsable by the same rule, read within the branch the claim was reached through, since
+`select.branch` wants a scope name and a claim id is a head. *show claim provenance* in the
+selection pane opens one in its own graph view, with the canvas, layouts, camera and lens
+every other view uses; one view per claim, and asking again brings it forward. The branch
+picker leaves such a view alone — its scope is the claim it is named for — while still
+setting the branch for the next read.
+
+Membership is keyed by head rather than name, a head being what identifies a closure: two
+claims' provenance read within one branch would otherwise share an answer.
+
+The claims a closure names but the session lacks are read after the view is drawn. A
+reference whose target has not arrived is held rather than discarded and drawn once it does,
+because a discarded reference makes the claim that stated it look like an initial claim — a
+claim with no references, which is the one thing this view exists to assert. Height settles
+which it is: an initial claim carries 0.
+
 ## Open: stretching x without stretching y
 
 The timeline already spreads the visible strata across the whole height, so a uniform zoom

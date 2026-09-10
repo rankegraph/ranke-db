@@ -9,7 +9,7 @@
  */
 
 import { shortId } from '../../core/claims.ts';
-import { edgeDetail } from '../../core/session.ts';
+import { edgeDetail } from '../../core/detail.ts';
 import { useExplorer } from '../../core/store.ts';
 import { revealClaim, walkHistory } from '../../render/renderer.ts';
 import { Empty, ExtensionFields, KeyValue, PaneTitle } from '../components/Field.tsx';

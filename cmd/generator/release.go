@@ -1,4 +1,4 @@
-// package: main / cmd
+// package: generator / cmd
 // type:    logic
 // job:     the release-process scenario — a fixed script, not a grown shape
 // limits:  builds claims only; delivering them is the client's (-> client.go)

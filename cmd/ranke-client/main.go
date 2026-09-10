@@ -1,4 +1,4 @@
-// package: main / cmd
+// package: ranke-client / cmd
 // type:    entrypoint
 // job:     the ranke-client binary — talk to a running instance over its REST contract
 // limits:  CLI wiring only; the requests are the official client's (-> client)

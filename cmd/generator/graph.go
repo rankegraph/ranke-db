@@ -1,4 +1,4 @@
-// package: main / cmd
+// package: generator / cmd
 // type:    logic
 // job:     the fixture identity and the graph shapes it signs
 // limits:  builds claims only; delivering them is the client's (-> client.go)

@@ -1,4 +1,4 @@
-// package: main / cmd
+// package: ranke-client / cmd
 // type:    entrypoint
 // job:     `ranke-client version` — print this build's version
 // limits:  CLI wiring; the value is internal/version's (-> internal/version)

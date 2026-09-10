@@ -1,4 +1,4 @@
-// package: main / cmd
+// package: ranke-db / cmd
 // type:    entrypoint
 // job:     `ranke-db version` — print this build's version
 // limits:  CLI wiring; the value is internal/version's (-> internal/version)
