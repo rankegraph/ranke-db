@@ -119,12 +119,14 @@ func add(
 }
 
 // admission is the claim that states pubkey, attributed to signing and signed under its key,
-// so what it registers is a key other than the one signing (`V-SIG`).
+// so what it registers is a key other than the one signing (`V-SIG`). Its height comes from
+// the claim it references, which carries its own (`V-HEIGHT`): a key admitted to the branch
+// sits above the one that admitted it, and the verifier re-derives what a guess would miss.
 func admission(signing ranke.Contributor, pubkey []byte) (ranke.Claim, error) {
 	claim, err := ranke.NewClaim(ranke.NodeContributor, signing).
 		WithInlineContent(pubkey).
 		WithEncoding(ranke.EncodingOctetStream).
-		WithHeight(signing.Node().Height() + 1).
+		WithHeight(ranke.HeightOf(signing)).
 		Sign()
 	if err != nil {
 		return nil, fmt.Errorf("sign a contributor claim attributed to %s: %w", signing.ID(), err)

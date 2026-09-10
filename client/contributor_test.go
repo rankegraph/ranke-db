@@ -227,10 +227,14 @@ func TestAKeyIsAdmittedByOneTheBranchHolds(t *testing.T) {
 	admission, err := ranke.NewClaim(ranke.NodeContributor, signing).
 		WithInlineContent(newcomer.Pubkey).
 		WithEncoding(ranke.EncodingOctetStream).
-		WithHeight(signing.Node().Height() + 1).
+		WithHeight(ranke.HeightOf(signing)).
 		Sign()
 	if err != nil {
 		t.Fatalf("sign the admission: %v", err)
+	}
+	if got := admission.Node().Height(); got != signing.Node().Height()+1 {
+		t.Errorf("height %d, want one above the %d of the contributor it is attributed to "+
+			"(`V-HEIGHT`)", got, signing.Node().Height())
 	}
 	if _, err := c.Dev().AdvanceClockPast(ctx, []ranke.Claim{admission}); err != nil {
 		t.Fatalf("advance the dev clock: %v", err)
@@ -255,10 +259,15 @@ func TestAKeyIsAdmittedByOneTheBranchHolds(t *testing.T) {
 	note, err := ranke.NewClaim("entity/note", as).
 		WithInlineContent([]byte("written by the admitted key")).
 		WithEncoding(ranke.EncodingText("plain")).
-		WithHeight(as.Node().Height() + 1).
+		WithHeight(ranke.HeightOf(as)).
 		Sign()
 	if err != nil {
 		t.Fatalf("sign under the admitted key: %v", err)
+	}
+	// Two above the founding claim: an admitted key's own claims sit above the admission,
+	// so a client hardcoding 1 here is refused by the verifier (`V-HEIGHT`).
+	if got := note.Node().Height(); got != 2 {
+		t.Errorf("a claim under the admitted key sits at height %d, want 2", got)
 	}
 	if _, err := c.Dev().AdvanceClockPast(ctx, []ranke.Claim{note}); err != nil {
 		t.Fatalf("advance the dev clock: %v", err)
