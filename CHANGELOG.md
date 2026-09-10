@@ -4,6 +4,39 @@ What each release changed for someone depending on this repository.
 
 ## Unreleased
 
+### Added
+
+- `client`, the official Go client for a running instance — `client.New(baseURL,
+  opts...)` over every one of the contract's 21 operations. It wraps
+  `openapi/client`, so a spec change breaks the build rather than drifting; a bare
+  `host:port` is read as `http`, and a request the caller supplied no `http.Client`
+  for is bounded by `client.DefaultTimeout`. `cmd/generator` and `cmd/ranke-client`
+  are its first two consumers and carry no HTTP of their own.
+- Credentials are one per client, refused at construction: `client.WithToken`,
+  `client.WithAPIKey`, `client.WithMacaroon`, or none for a NoAuth endpoint.
+  `WithMacaroon` is separate because the endpoint routes `Authorization: Bearer` to
+  the JWT authenticator, where a macaroon 401s with nothing naming the cause.
+- A refused request is a `*client.Error` carrying the contract's `code`, matching
+  the sentinel for its category through `errors.Is` — `ErrUnauthenticated`,
+  `ErrForbidden`, `ErrNotFound`, `ErrConflict`, `ErrBusy`, `ErrInvalid`,
+  `ErrUnimplemented`.
+- `client.DecodeRecord` reads one record of a result sequence in either framing —
+  RFC 7464 json-seq or RFC 8742 cbor-seq — into ranke-go's `QueryResult`, the
+  trailing execution report included. `Client.QueryRaw` hands back the split records
+  untouched, `Client.Query` the decoded ones, and `Client.QueryClaims` pins the
+  stored-envelope output whose bytes re-hash to the id (`R-QCANON`).
+- `ranke-client --macaroon` and `generator --macaroon` present a base64 macaroon,
+  the one credential carrying caveats.
+- `rest_http.Server.Handler()` returns the routed endpoint without a listener under
+  it, for a caller driving the routes directly.
+
+### Fixed
+
+- A query setting `execution.report` now ends its result sequence with the report,
+  as `rest-api` requires. The report element reached the record writer, which has no
+  payload field for it, and the write failed silently — so every reported run came
+  back with its results and no report at all.
+
 ## v1.23.0 — 2026-09-10
 
 ### Added

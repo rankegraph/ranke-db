@@ -56,6 +56,13 @@ func (s *queryStream) ContentType() string { return s.seq.mediaType }
 func (s *queryStream) WriteTo(w io.Writer) (int64, error) {
 	var n int64
 	for s.results.Next() {
+		// The report is the stream's own final element (`R-QSTREAM`), and is written
+		// below once the results are out. Stepping over it here is what keeps that
+		// from asking a report for the payload field a result carries — which it has
+		// none of, so the write failed and took the report off the wire with it.
+		if s.results.Result().Kind == ranke.KindReport {
+			continue
+		}
 		written, err := s.writeResult(w, s.results.Result())
 		n += written
 		if err != nil {

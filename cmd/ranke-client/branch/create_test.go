@@ -58,14 +58,3 @@ func TestContributorIdIsStableAcrossRuns(t *testing.T) {
 		t.Errorf("contributor id moved between runs: %s then %s", first[0].ID(), again[0].ID())
 	}
 }
-
-// TestCreationIsWritable: the wire assembles, which is what the server is handed.
-func TestCreationIsWritable(t *testing.T) {
-	body, err := creation("reports", keypair(t))
-	if err != nil {
-		t.Fatalf("creation: %v", err)
-	}
-	if len(body) == 0 {
-		t.Error("the contribution stream is empty")
-	}
-}

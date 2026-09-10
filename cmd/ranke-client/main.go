@@ -1,7 +1,7 @@
 // package: main / cmd
 // type:    entrypoint
 // job:     the ranke-client binary — talk to a running instance over its REST contract
-// limits:  CLI wiring only; the requests are the generated client's (-> openapi/client)
+// limits:  CLI wiring only; the requests are the official client's (-> client)
 //
 // One binary per role: `ranke-db` operates an instance from its config, this one holds a
 // contributor key and addresses a server already up. A contributor key signs claims into
@@ -44,6 +44,8 @@ func rootCmd() *cobra.Command {
 		"Authorization: Bearer credential")
 	root.PersistentFlags().StringVar(&inst.APIKey, "api-key", "",
 		"X-API-Key credential")
+	root.PersistentFlags().StringVar(&inst.Macaroon, "macaroon", "",
+		"Authorization: Macaroon credential, base64 — the one credential carrying caveats")
 	root.AddCommand(whoamiCmd(&inst), branch.Cmd(&inst), versionCmd())
 	return root
 }

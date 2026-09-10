@@ -1,7 +1,8 @@
 // package: main / cmd
 // type:    entrypoint
 // job:     the generator binary — a client that seeds a running ranke-db over its REST API
-// limits:  a client only: no config, no adapters, no archive of its own (-> cmd/ranke-db serves)
+// limits:  a client only: no config, no adapters, no archive of its own (-> cmd/ranke-db serves),
+// and no transport of its own either (-> client)
 //
 // Seeding belongs to a client: a contributor is an application-held key (§5.7), so a
 // fixture signs its own claims and the server attests only the merge. Filling a dev
@@ -17,6 +18,8 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/rankegraph/ranke-go"
+
+	"github.com/rankegraph/ranke-db/client"
 )
 
 func main() {
@@ -33,7 +36,25 @@ type options struct {
 	as       string
 	token    string
 	apiKey   string
+	macaroon string
 	wait     time.Duration
+}
+
+// connect points the official client at url with whatever credential was named. It is
+// where the flags stop being strings: presenting more than one is refused here, as the
+// endpoint routes on the scheme and could not resolve two.
+func (o *options) connect(url string) (*client.Client, error) {
+	var opts []client.Option
+	if o.token != "" {
+		opts = append(opts, client.WithToken(o.token))
+	}
+	if o.apiKey != "" {
+		opts = append(opts, client.WithAPIKey(o.apiKey))
+	}
+	if o.macaroon != "" {
+		opts = append(opts, client.WithMacaroon(o.macaroon))
+	}
+	return client.New(url, opts...)
 }
 
 // rootCmd builds the generator command tree: one subcommand per graph shape.
@@ -51,6 +72,7 @@ func rootCmd() *cobra.Command {
 	f.StringVar(&o.as, "as", "dev", "contributor name; the same name always derives the same fixture identity")
 	f.StringVar(&o.token, "token", "", "Authorization: Bearer credential")
 	f.StringVar(&o.apiKey, "api-key", "", "X-API-Key credential")
+	f.StringVar(&o.macaroon, "macaroon", "", "Authorization: Macaroon credential, base64")
 	f.DurationVar(&o.wait, "wait", 0, "wait up to this long for the server to answer /health before writing")
 	root.AddCommand(exampleCmd(&o), chainCmd(&o), releaseCmd(&o), versionCmd())
 	return root
@@ -117,9 +139,12 @@ const progressEvery = 10
 // only cite what the archive already holds, so the batches go up one at a time.
 func deliver(cmd *cobra.Command, url string, o *options, shape func(*grower) (batches, error)) error {
 	ctx := cmd.Context()
-	c := newClient(url, o.token, o.apiKey)
+	c, err := o.connect(url)
+	if err != nil {
+		return err
+	}
 	if o.wait > 0 {
-		if err := c.waitReady(ctx, o.wait); err != nil {
+		if err := c.WaitReady(ctx, o.wait); err != nil {
 			return err
 		}
 	}
@@ -134,7 +159,7 @@ func deliver(cmd *cobra.Command, url string, o *options, shape func(*grower) (ba
 	}
 
 	out := cmd.OutOrStdout()
-	fmt.Fprintf(out, ">> %s — contributing as %q\n", c.base, o.as)
+	fmt.Fprintf(out, ">> %s — contributing as %q\n", c.BaseURL(), o.as)
 	total := 0
 	perBranch := map[string]int{}
 	seeded := map[string]bool{}
@@ -149,14 +174,12 @@ func deliver(cmd *cobra.Command, url string, o *options, shape func(*grower) (ba
 		// Steer the merge time to this batch's own story, before it lands — the first call
 		// of the run included, so even the sequencer's bootstrap identity (minted at server
 		// start, before any of this) is the last thing left dated off the real clock.
-		if err := c.advanceClock(ctx, maxCreatedAt(claims)); err != nil {
+		if _, err := c.Dev().AdvanceClockPast(ctx, claims); err != nil {
 			return fmt.Errorf("advance dev clock for contribution %d/%d: %w", i+1, len(bs), err)
 		}
-		body, err := encodeContribution(b.branch, claims)
-		if err != nil {
-			return err
-		}
-		res, err := c.contribute(ctx, body)
+		// A generated graph cites only itself and the branch it joins, and every shape
+		// but the first writes onto a branch that does not exist yet.
+		res, err := c.Contribute(ctx, nil, b.branch, claims, client.Creating())
 		if err != nil {
 			return fmt.Errorf("contribution %d/%d onto %q: %w", i+1, len(bs), b.branch, err)
 		}
@@ -177,21 +200,9 @@ func deliver(cmd *cobra.Command, url string, o *options, shape func(*grower) (ba
 	return report(ctx, cmd, c, o.branch)
 }
 
-// maxCreatedAt is the latest created_at among claims — a batch's own story time, and
-// what the dev clock should be at no earlier than before the batch is merged.
-func maxCreatedAt(claims []ranke.Claim) time.Time {
-	var at time.Time
-	for _, c := range claims {
-		if t := c.Node().CreatedAt(); t.After(at) {
-			at = t
-		}
-	}
-	return at
-}
-
 // report reads the branch back, so a seed that claims to have written shows it served.
-func report(ctx context.Context, cmd *cobra.Command, c *client, branch string) error {
-	head, err := c.head(ctx, branch)
+func report(ctx context.Context, cmd *cobra.Command, c *client.Client, branch string) error {
+	head, err := c.BranchHead(ctx, branch)
 	if err != nil {
 		return fmt.Errorf("read back %q: %w", branch, err)
 	}
