@@ -4,6 +4,8 @@ What each release changed for someone depending on this repository.
 
 ## Unreleased
 
+## v1.24.0 — 2026-09-10
+
 ### Added
 
 - `client`, the official Go client for a running instance — `client.New(baseURL,
