@@ -185,11 +185,14 @@ section is empty is refused, since it would record nothing. The stamping lives
 in ranke-graph's shared `release-cycle.sh`, which this repo caches under
 `bin/`, and where `CHANGELOG.md` is missing the first release writes it.
 
-A stamped section keeps its group headings, so read the file and find
-`## Unreleased` before writing rather than anchoring an edit on `### Fixed` or
-`### Removed`. A release cut since you last looked leaves those headings inside
-a shipped version, where an entry claims a change that release never carried
-and leaves `## Unreleased` empty — which the next release then refuses.
+Anchor the edit on `## Unreleased` and on nothing else. A release cut since you
+last read the file stamps a version heading above everything, and a stamped
+section keeps the group headings and bullets it already had, so `### Fixed`, or
+any line already in the file, may now sit inside a version that shipped. An
+entry written there claims a change that release never carried, and leaves
+`## Unreleased` empty for the next release to refuse. Read the top of the file
+first: the heading below `## Unreleased` tells you whether a release landed
+while you were working.
 
 ## Layout
 
