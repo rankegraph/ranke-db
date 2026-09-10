@@ -4,6 +4,8 @@ What each release changed for someone depending on this repository.
 
 ## Unreleased
 
+## v1.25.0 — 2026-09-10
+
 ### Added
 
 - `client.Client.ResolveContributor(ctx, keypair, at, pick)` answers the contributor a
