@@ -37,6 +37,11 @@ node_modules: package.json package-lock.json
 	@npm install --no-audit --no-fund
 	@touch node_modules
 
+# The version shown under the wordmark, stamped the way the server stamps its binary.
+# A bare `vite build` gets none and says "dev" rather than claiming a release.
+EXPLORER_VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
+export EXPLORER_VERSION
+
 dev: node_modules ## Start the dev server (open the URL it prints, then press 'load')
 	@echo ">> sources live in the Server tab: a mock archive, or a ranke-db instance"
 	@$(VITE) --host

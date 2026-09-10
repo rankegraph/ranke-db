@@ -18,6 +18,7 @@ import { fitHeight, graphXAt, panTo } from '../../render/camera.ts';
 import { canvasWidth } from '../../render/instances.ts';
 import { scopeOptions } from '../../core/scope.ts';
 import { activeView, useExplorer } from '../../core/store.ts';
+import { VERSION } from '../../version.ts';
 
 /**
  * The navigation tools. Each is one click for something the wheel can only approximate, and
@@ -152,7 +153,10 @@ export function Header() {
     <header className="topbar">
       <div className="brand">
         <span className="brand-mark" aria-hidden="true" dangerouslySetInnerHTML={{ __html: icon }} />
-        <span className="brand-name">Ranke Explorer</span>
+        <span className="brand-text">
+          <span className="brand-name">Ranke Explorer</span>
+          <span className="brand-version" title="this explorer build">{VERSION}</span>
+        </span>
       </div>
 
       <div className="toolbar" role="toolbar" aria-label="Tools">

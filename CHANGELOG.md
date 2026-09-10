@@ -4,6 +4,43 @@ What each release changed for someone depending on this repository.
 
 ## Unreleased
 
+### Added
+
+- `ranke-client`, a second binary for the client half. It holds a contributor key and
+  addresses a server already running, where `ranke-db` operates an instance from its
+  config and makes no request. Keeping them apart keeps two unlike keys apart: a
+  contributor key signs claims into their ids, the server's identity attests the merge.
+  It links none of the storage or vault drivers.
+- `ranke-client whoami` reports the account a credential resolves to, its grants and any
+  caveats.
+- `ranke-client branch create <name> --signing-key <spec>` creates a branch by
+  contributing the claim that records it, together with the creator's contributor claim.
+  That pairing is the point: a branch whose closure reaches no contributor admits no
+  writer, and the record's reference is what pulls one in. A branch that already exists
+  is reported and left alone, so it can run before every deployment.
+- `--signing-key` takes a path, `file:PATH`, `env:NAME`, `stdin` or `prompt`, through
+  ranke-go's `keysource`. A key file is refused unless `0600`, a key given as the flag's
+  own value is refused and reported as compromised — a command line reaches the process
+  table, shell history and any CI log — and an unrecognised scheme is named rather than
+  read as a filename.
+- A Go client generated from `openapi.yaml` into `openapi/client/`, so a client tracks
+  the contract rather than restating it.
+- `make dev` builds `frontend/dist/explorer.html` first. `-tags explorer` embeds it at
+  compile time, so a committed bundle meant the dev loop served whatever was last
+  released.
+- The explorer names its own build under the wordmark, stamped from `git describe` the
+  way the binary is, and reports each connection's server version on the Server tab.
+
+### Changed
+
+- ranke-go v0.31.0, whose `keysource` package and `ParseKeypair` replace a hand-written
+  copy of both here.
+
+### Fixed
+
+- The Server tab probes its connections when it opens. The probe existed but ran only
+  from a button inside an expanded row, so the tab listed names and no health at all.
+
 ## v1.21.0 — 2026-09-10
 
 ### Changed

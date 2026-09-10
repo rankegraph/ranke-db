@@ -110,7 +110,7 @@ TOOLS_BIN         := bin/tools
 BROKKR            := $(TOOLS_BIN)/brokkr
 BROKKR_INSTALL_SH := https://raw.githubusercontent.com/flocko-motion/sindri/master/scripts/install-brokkr.sh
 
-.PHONY: all help check check-tools generate verify lint tidy build smoke test dev seed \
+.PHONY: all help check check-tools generate verify lint tidy build smoke test dev seed explorer \
         ranke-go-version upgrade release major minor patch breaking feature fix \
         docs docs-papers docs-current docs-release docs-check docs-pdf docs-bundle docs-clean print-typst-version \
         pull-rql-schema check-rql-schema check-generated release-gate check-clean-tree check-release-bump
@@ -179,11 +179,13 @@ check-tools: ## Verify the toolchain is installed at the versions this repo pins
 	fi; \
 	echo "toolchain OK (go + node + typst $$have)"
 
-generate: check-tools ## Generate every artifact from the spec into openapi/ (Go server, TS client, HTML, Markdown) + the explorer's copy of the client + docs/openapi/ symlinks
+generate: check-tools ## Generate every artifact from the spec into openapi/ (Go server + client, TS client, HTML, Markdown) + the explorer's copy of the client + docs/openapi/ symlinks
 	@echo ">> bundle   → $(OPENAPI_GEN)"
 	@npx --yes $(REDOCLY) bundle $(OPENAPI) -o $(OPENAPI_GEN) >/dev/null
 	@echo ">> gen-go   → $(API_OUT)/openapi.gen.go"
 	@go tool oapi-codegen -config $(API_OUT)/oapi-codegen.yaml $(OPENAPI_GEN)
+	@echo ">> gen-goc  → $(API_OUT)/client/client.gen.go"
+	@go tool oapi-codegen -config $(API_OUT)/oapi-codegen-client.yaml $(OPENAPI_GEN)
 	@echo ">> gen-ts   → $(API_OUT)/openapi.gen.ts"
 	@npx --yes $(SWAGGER_TS) generate -p $(OPENAPI_GEN) -o $(API_OUT) -n openapi.gen.ts >/dev/null
 	@echo ">> copy     → $(EXPLORER_CLIENT)"
@@ -235,10 +237,14 @@ SEED_ARGS = $(strip $(if $(filter big,$(SEED)), \
 # Seeding runs as a client, which is what a contributor is — so the generator goes into
 # the background with --wait, contributes as soon as /health answers, and exits, while
 # the server keeps the foreground and ctrl-c.
+explorer: ## Build frontend/dist/explorer.html, the bundle -tags explorer embeds
+	@$(MAKE) --no-print-directory -C frontend single
+
 # -tags explorer here, not in `build`: a dev loop is exactly where clicking through
-# /explorer is wanted, and dist/explorer.html is committed, so this needs no frontend
-# build step. `build`/`smoke`/CI stay untagged — that default is unrelated to this one.
-dev: ## Run a dev server from DEV_CONFIG with /explorer active (SEED=example|release|chain|big to seed it once it answers)
+# /explorer is wanted. It embeds dist/explorer.html at compile time, so the bundle is
+# rebuilt first — a committed one is whatever was last released, and serving that while
+# editing the frontend shows work that is not there. `build`/`smoke`/CI stay untagged.
+dev: explorer ## Run a dev server from DEV_CONFIG with /explorer active (SEED=example|release|chain|big to seed it once it answers)
 	@command -v openssl >/dev/null 2>&1 || { echo "ERROR: dev needs openssl to mint a throwaway signing key"; exit 1; }
 	@echo ">> build → $(BIN) (-tags explorer)"
 	@go build -tags explorer -ldflags "$(LDFLAGS)" -o $(BIN) ./cmd/ranke-db
