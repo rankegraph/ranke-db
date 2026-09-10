@@ -4,6 +4,21 @@ What each release changed for someone depending on this repository.
 
 ## Unreleased
 
+## v1.23.0 — 2026-09-10
+
+### Added
+
+- Every binary carries a `version` subcommand — `ranke-db version`, `ranke-client
+  version`, `generator version` — printing the build it is. `make build` compiles and
+  stamps all three, where it built two and stamped one.
+
+### Changed
+
+- A release carries `ranke-client` beside `ranke-db`, and both are stamped with the tag
+  they were cut from rather than leaving the version to the toolchain's VCS stamping.
+- The release matrix drops `darwin-amd64`, leaving `linux-amd64`, `linux-arm64` and
+  `darwin-arm64`.
+
 ## v1.22.0 — 2026-09-10
 
 ### Added

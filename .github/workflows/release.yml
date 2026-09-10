@@ -75,8 +75,6 @@ jobs:
           - goos: linux
             goarch: arm64
           - goos: darwin
-            goarch: amd64
-          - goos: darwin
             goarch: arm64
     runs-on: ubuntu-latest
     steps:
@@ -91,22 +89,31 @@ jobs:
           name: explorer-html
           path: frontend/dist
 
-      # Static (CGO_ENABLED=0): the server has no cgo dependency, and a static
+      # Static (CGO_ENABLED=0): neither binary has a cgo dependency, and a static
       # binary is what a downloader can run without matching the build host's libc.
-      - name: Build ranke-db
+      #
+      # Both halves ship: ranke-db operates an instance from its config, ranke-client
+      # holds a contributor key and addresses one already running. Only the server
+      # takes -tags explorer, the client embedding no UI.
+      #
+      # The version is stamped from the tag rather than left to the toolchain's own
+      # VCS stamping, so what /health and `ranke-db` at / report is the release name
+      # and not a pseudo-version derived from a shallow checkout.
+      - name: Build the binaries
         env:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
           CGO_ENABLED: 0
         run: |
-          out="ranke-db-${{ matrix.goos }}-${{ matrix.goarch }}"
-          go build -tags explorer -o "$out" ./cmd/ranke-db
+          suffix="${{ matrix.goos }}-${{ matrix.goarch }}"
+          ldflags="-X github.com/rankegraph/ranke-db/internal/version.injected=${{ github.ref_name }}"
           mkdir -p dist
-          mv "$out" "dist/$out"
+          go build -tags explorer -ldflags "$ldflags" -o "dist/ranke-db-$suffix" ./cmd/ranke-db
+          go build -ldflags "$ldflags" -o "dist/ranke-client-$suffix" ./cmd/ranke-client
 
       - uses: actions/upload-artifact@v4
         with:
-          name: ranke-db-${{ matrix.goos }}-${{ matrix.goarch }}
+          name: binaries-${{ matrix.goos }}-${{ matrix.goarch }}
           path: dist/*
           retention-days: 1
 
