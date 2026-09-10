@@ -9,6 +9,7 @@
  * to say "type" and leave which one open.
  */
 
+import { asText, contentOf, isTextual } from './content.ts';
 import { graph } from './graph/universe.ts';
 
 /**
@@ -100,4 +101,32 @@ export function claimDetail(id: string) {
     referencedBy,
     referencedByCount: g.inDegree(id),
   };
+}
+
+/**
+ * claimText is a claim's content read as characters, or empty where the encoding says the bytes
+ * are not text or no read has brought them in. The encoding travels on the claim; the bytes sit
+ * in the content cache, which a capped read fills for every small body it returns.
+ */
+export function claimText(id: string): string {
+  const g = graph();
+  if (!g.hasNode(id)) return '';
+  if (!isTextual(g.getNodeAttribute(id, 'encoding') as string | undefined)) return '';
+  const bytes = contentOf(id);
+  return bytes ? asText(bytes).trim() : '';
+}
+
+/** How much of a claim's first line a caption carries. */
+export const CAPTION_TEXT_CHARS = 60;
+
+/**
+ * captionText is what a claim says, for the second line of its caption: the first line of its
+ * content, cut to a length that reads beside a dot. A type names what kind of thing a claim is
+ * and this names the thing — which is the difference between reading a provenance chain and
+ * clicking through it claim by claim.
+ */
+export function captionText(id: string): string {
+  const first = claimText(id).split('\n', 1)[0]?.trim() ?? '';
+  if (first.length <= CAPTION_TEXT_CHARS) return first;
+  return `${first.slice(0, CAPTION_TEXT_CHARS).trimEnd()}…`;
 }

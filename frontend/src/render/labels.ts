@@ -24,9 +24,19 @@ const LINE_GAP = 2;
  */
 const MAX_LABEL_WIDTH_CELLS = 1.4;
 
+/**
+ * Cells a caption may span where the node asks for the room (-> render/renderer, a provenance
+ * caption). A closure is drawn with few claims and a line of what each one says, so the text is
+ * the point and there is space beside it; six cells is about sixty characters at the stock font.
+ */
+const WIDE_LABEL_CELLS = 6;
+
 const ELLIPSIS = '…';
 
-type LabelData = PartialButFor<NodeDisplayData, 'x' | 'y' | 'size' | 'label' | 'color'>;
+type LabelData = PartialButFor<NodeDisplayData, 'x' | 'y' | 'size' | 'label' | 'color'> & {
+  /** Set by the reducer on a caption whose text is worth the width (-> WIDE_LABEL_CELLS). */
+  wideLabel?: boolean;
+};
 
 /** lines splits a caption into what is drawn, dropping the empties a stray newline leaves. */
 function lines(label: string | undefined | null): string[] {
@@ -78,7 +88,8 @@ export function drawNodeLabel(context: CanvasRenderingContext2D, data: LabelData
 
   const step = size + LINE_GAP;
   const first = data.y + size / 3 - ((rows.length - 1) * step) / 2;
-  const maxWidth = settings.labelGridCellSize * MAX_LABEL_WIDTH_CELLS;
+  const cells = data.wideLabel ? WIDE_LABEL_CELLS : MAX_LABEL_WIDTH_CELLS;
+  const maxWidth = settings.labelGridCellSize * cells;
   rows.forEach((row, i) =>
     context.fillText(fitToWidth(context, row, maxWidth), data.x + data.size + 3, first + i * step),
   );

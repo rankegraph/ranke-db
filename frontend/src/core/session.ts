@@ -462,7 +462,13 @@ export async function relayout(layout: LayoutName): Promise<void> {
  * attributes on the one shared graph, so a layout is always union-wide; what a caller chooses
  * is the framing — 'keep' for a read into a view already on screen, which must not jump.
  */
-export async function layOut(layout: LayoutName, stretch: Stretch, framing: Framing): Promise<void> {
+export async function layOut(
+  layout: LayoutName,
+  stretch: Stretch,
+  framing: Framing,
+  /** Place only what the view packs, for a read into a picture already drawn. */
+  only = false,
+): Promise<void> {
   const store = useExplorer.getState();
   // A 'keep' pass is a read into a view on screen, so it raises no overlay: covering the
   // canvas is one of the disturbances a later read is meant to avoid.
@@ -473,7 +479,7 @@ export async function layOut(layout: LayoutName, stretch: Stretch, framing: Fram
   const ms = await apply(g, layout, {
     depth,
     contribution: contributionOf(g),
-    timeline: layout === 'timeline' ? timelineContext(stretch) : undefined,
+    timeline: layout === 'timeline' ? timelineContext(stretch, only) : undefined,
   });
   log(`layout      ${ms.toFixed(0)} ms · ${layout}`);
   notifyLoaded(framing);

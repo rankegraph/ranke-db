@@ -76,7 +76,25 @@ export interface TimelineContext {
   /** Stretch on the strata, 1 being the height below — scales finished positions rather than
    * the layout height, so a band keeps its lanes and neighbours and only the room between grows. */
   yStretch?: number;
+  /** Stretch on time, which the packing gap is measured in so a zoom never reshuffles lanes. */
+  xStretch?: number;
+  /**
+   * Claims to place in packed lanes rather than by hash: within a band each takes the lowest
+   * lane its neighbour in time leaves free, so a small set reads without overlap and every dot
+   * can carry a caption. A provenance view passes its own closure (-> core/provenance).
+   */
+  pack?: ReadonlySet<string>;
+  /** Place only the packed claims, leaving every other claim at the position it holds. */
+  only?: boolean;
 }
+
+/**
+ * Room a packed claim keeps to its right, in unstretched axis units — about nine node
+ * diameters (-> timescale minStep), which is what a short caption spans at the zoom a fit
+ * opens on. Captions are drawn in screen space, so no gap in graph units clears them at every
+ * zoom; this one clears them where a reader starts.
+ */
+export const PACK_GAP_UNITS = 72;
 
 /** How tall the whole picture is, in graph units — the extent the renderer normalises against. */
 export const TIMELINE_HEIGHT = 1000;
@@ -116,7 +134,9 @@ function slotOf(base: number, height: number): Slot {
 
 /**
  * assignTimeline puts time on x and class strata on y. Claims sharing an instant share an x.
- * Within a slot, lane is a hash of the claim id, not time order — a time-sorted round-robin put
+ * A packed set takes its lanes in time order instead (-> ctx.pack), which is affordable for the
+ * few a provenance view draws and reads better than a scatter.
+ * Within a slot, lane is otherwise a hash of the claim id — a time-sorted round-robin put
  * neighbours in time on consecutive lanes, drawing a diagonal staircase of collisions instead of
  * a scatter. Every band — and the contribution band's head subband (-> HEAD_SUBBAND_FRACTION) —
  * gets a fixed share of height regardless of which classes are currently shown, so a View-tab
@@ -139,15 +159,47 @@ export function assignTimeline(graph: DirectedGraph, ctx: TimelineContext): void
 
   const stretch = ctx.yStretch ?? 1;
   const placed = new Map<string, { x: number; y: number }>();
+
+  /** slotFor is the slice a claim belongs in: its band, and the head subband within it. */
+  const slotFor = (node: string): Slot => {
+    const slots = slotsOf.get(BANDS[stratumOf(ctx.classOf(node))]);
+    return (slots?.head && ctx.subOf(node) === 'head' ? slots.head : slots?.rest) ?? slotOf(0, 0);
+  };
+
+  const packing: { node: string; x: number; slot: Slot }[] = [];
+  // A restriction with nothing to restrict to would place no claim at all, which is never what
+  // a caller means by it — an empty pack is a view whose membership has not been answered.
+  const only = ctx.only === true && (ctx.pack?.size ?? 0) > 0;
   graph.forEachNode((node) => {
-    const band = BANDS[stratumOf(ctx.classOf(node))];
-    const slots = slotsOf.get(band);
-    const slot = (slots?.head && ctx.subOf(node) === 'head' ? slots.head : slots?.rest) ?? slotOf(0, 0);
-    const lane = hashString(node) % slot.lanes;
+    const inPack = ctx.pack?.has(node) ?? false;
+    if (only && !inPack) return;
     const x = ctx.toX(ctx.createdAt(node));
-    const y = (slot.base + lane * slot.laneGap) * stretch;
-    placed.set(node, { x, y });
+    const slot = slotFor(node);
+    if (inPack) {
+      packing.push({ node, x, slot });
+      return;
+    }
+    const lane = hashString(node) % slot.lanes;
+    placed.set(node, { x, y: (slot.base + lane * slot.laneGap) * stretch });
   });
+
+  // In time order, so "the lane its neighbour leaves free" is a question about one pass.
+  packing.sort((a, b) => a.x - b.x);
+  const gap = PACK_GAP_UNITS * (ctx.xStretch ?? 1);
+  const freeFrom = new Map<Slot, number[]>();
+  for (const { node, x, slot } of packing) {
+    let lanes = freeFrom.get(slot);
+    if (!lanes) {
+      lanes = new Array<number>(slot.lanes).fill(-Infinity);
+      freeFrom.set(slot, lanes);
+    }
+    let lane = lanes.findIndex((from) => from <= x);
+    // Every lane still held: more claims stand together than the band has lanes, so the one
+    // free longest takes it. No lane would avoid the overlap, and the band keeps its height.
+    if (lane < 0) lane = lanes.indexOf(Math.min(...lanes));
+    lanes[lane] = x + gap;
+    placed.set(node, { x, y: (slot.base + lane * slot.laneGap) * stretch });
+  }
 
   graph.updateEachNodeAttributes((node, attr) => {
     const at = placed.get(node);

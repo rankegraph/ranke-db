@@ -15,7 +15,7 @@ import { sourceFor } from './data/source.ts';
 import type { DataSource } from './data/source.ts';
 import type { DrawnClaim } from './claims.ts';
 import { graph, mergeMore, unreadRefs } from './graph/universe.ts';
-import { setMembers } from './graph/members.ts';
+import { membersOf, setMembers } from './graph/members.ts';
 import { yieldToPaint } from './scheduler.ts';
 import { activeView, defaultView, useExplorer } from './store.ts';
 import type { ViewState } from './store.ts';
@@ -60,8 +60,9 @@ export async function openClaimProvenance(id: string): Promise<void> {
   const viewId = nextViewId();
   const view = defaultView(viewId, `provenance ${shortId(id)}`);
   view.scope = scope;
-  // The closure read layer by layer, which is what a derivation is.
-  view.layout = 'layered';
+  // The layout `defaultView` opens on, which is the timeline: a claim's provenance is the
+  // historical view a reader already knows, filtered to one closure. What the closure gets of
+  // its own is packed lanes and a caption apiece (-> layout/layouts pack, labelEveryClaim).
   store.addTab(view);
   await readProvenance(scope);
 }
@@ -94,8 +95,10 @@ async function readProvenance(scope: Scope): Promise<void> {
   setMembers(scopeKey(scope), ids);
   log(`provenance  ${ids.length.toLocaleString('en-US')} claims in the closure of ${shortId(scope.head)}`);
   // What the session already holds is laid out and framed now — this view has just opened, so
-  // there is no reading to disturb. The rest follows without moving it.
-  await layOut('layered', { x: 1, y: 1 }, 'fit');
+  // there is no reading to disturb, and the membership above is what the pass packs. The rest
+  // follows without moving it.
+  const opened = activeView(useExplorer.getState());
+  await layOut(opened?.layout ?? 'timeline', opened ? stretchOf(opened) : { x: 1, y: 1 }, 'fit');
   await loadMore(scope, ids);
 }
 
@@ -133,8 +136,27 @@ export async function loadMore(scope: Scope, ids: string[]): Promise<void> {
       `${waiting > 0 ? `, ${waiting} still waiting on a target` : ''}`,
   );
   useExplorer.getState().patchStatus({ busy: null, progress: null, nodes: g.order, edges: g.size });
-  // What arrived has no position until a layout runs; 'keep' leaves the camera alone.
-  await layOut(view?.layout ?? 'layered', view ? stretchOf(view) : { x: 1, y: 1 }, 'keep');
+  // What arrived has no position until a layout runs; 'keep' leaves the camera alone, and the
+  // last argument places the closure alone, so no claim outside this view moves for a read
+  // this view asked for (-> core/timeline timelineContext, which drops it if the axis moved).
+  await layOut(view?.layout ?? 'timeline', view ? stretchOf(view) : { x: 1, y: 1 }, 'keep', true);
+}
+
+/**
+ * Above this many claims in a closure, a caption apiece is a wall of text, so Sigma's own
+ * density gate takes over.
+ */
+export const LABEL_EVERY_UPTO = 400;
+
+/**
+ * labelEveryClaim reports whether a view captions every claim it draws. A provenance view is
+ * one closure, small and read closely, where the reader wants to know what each dot is without
+ * clicking it — which is a fact about the view, so the renderer asks rather than deciding.
+ */
+export function labelEveryClaim(view: ViewState | null): boolean {
+  if (!view?.scope || !isProvenance(view.scope)) return false;
+  const members = membersOf(scopeKey(view.scope));
+  return members !== null && members.size <= LABEL_EVERY_UPTO;
 }
 
 /**

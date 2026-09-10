@@ -11,9 +11,25 @@ What each release changed for someone depending on this repository.
   lens every other view uses. One view per claim; asking again brings it forward. A provenance
   scope is read within the branch the claim was reached through, through the identities-only
   query a branch scope already sends — no new route and no server change.
+  It draws on the timeline, the axis every other view draws on, so the ruler, the time cursor
+  and both stretches mean in it what they mean everywhere else — the historical picture,
+  filtered to one closure. What the closure gets of its own is placement and captions: within
+  each band its claims take lanes in time order, each in the lowest lane its neighbour in time
+  leaves free rather than the hash lane every other claim takes, so a closure reads without
+  overlap; and every claim in a closure of up to 400 carries its caption, including while
+  another claim is selected. A caption there takes a second line — the first line of what the
+  claim says, up to 60 characters — so a chain reads as text rather than as dots to click
+  through, where a type alone says only what kind of thing each one is. Claims read after the
+  view is drawn are placed without moving the ones already on screen, unless the read moved the
+  time axis, which moves every claim with it.
 
 ### Changed
 
+- ranke-go moves to v0.33.1, where a verification failure travels as the cause of the
+  Sequencer's error. A refused contribution is answered with the claim and the rule alone —
+  `ranke.verify: claim bciq…: §4.1 height — … got 5, want 1` — where it carried the
+  Sequencer's own wrapper and a Go struct dump around them. A contribution of many claims
+  therefore names the one to correct.
 - A `Scope` carries `branch`, the scope a query names to read it (`select.branch`, `R-QSCOPE`),
   beside the head whose closure it is. A branch and `$archive` are read within themselves; a
   claim's provenance within the branch it was reached through. Code building a `Scope` literal

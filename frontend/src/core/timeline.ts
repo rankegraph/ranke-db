@@ -16,6 +16,8 @@ import { TIMELINE_HEIGHT, assignTimeline } from './layout/layouts.ts';
 import type { TimelineContext } from './layout/layouts.ts';
 import { timeScale } from './layout/timescale.ts';
 import type { TimeScale } from './layout/timescale.ts';
+import { membersOf } from './graph/members.ts';
+import { isProvenance, scopeKey } from './scope.ts';
 import { activeView, useExplorer } from './store.ts';
 import type { ViewState } from './store.ts';
 
@@ -58,13 +60,29 @@ export function stretchOf(view: ViewState): Stretch {
   return { x: view.xStretch, y: view.yStretch };
 }
 
-/** timelineContext reads the instants off the graph and builds the axis. */
-export function timelineContext(stretch: Stretch = { x: 1, y: 1 }): TimelineContext {
+/**
+ * packOf is the set a view packs into lanes: a provenance view's own closure, which is small
+ * enough to place in time order (-> layout/layouts pack). Derived here rather than passed in,
+ * so a stretch, a load and a relayout all pack the same claims the same way.
+ */
+function packOf(view: ViewState | null): ReadonlySet<string> | undefined {
+  if (!view?.scope || !isProvenance(view.scope)) return undefined;
+  return membersOf(scopeKey(view.scope)) ?? undefined;
+}
+
+/**
+ * timelineContext reads the instants off the graph and builds the axis. `only` places just the
+ * packed claims, for a read into a view already drawn — unless this rebuild moved the axis,
+ * where every claim's x moved with it and placing a few would draw two axes at once.
+ */
+export function timelineContext(stretch: Stretch = { x: 1, y: 1 }, only = false): TimelineContext {
   const g = graph();
   const createdAt = (node: string) => Number(g.getNodeAttribute(node, 'createdAt') ?? 0);
   const instants: number[] = [];
   g.forEachNode((node) => instants.push(createdAt(node)));
+  const before = axis;
   axis = timeScale(instants);
+  const stood = before !== null && before.width === axis.width && before.instants === axis.instants;
   // The full axis, not the dense range: this is the bound a reader can zoom out to, and a
   // remote outlier must stay reachable by it. Where the *first* look lands is a separate,
   // narrower question (-> fitDenseTime in render/camera.ts, denseExtent below).
@@ -75,6 +93,9 @@ export function timelineContext(stretch: Stretch = { x: 1, y: 1 }): TimelineCont
     classOf: (node) => String(g.getNodeAttribute(node, 'cls') ?? ''),
     subOf: (node) => subtypeOf(String(g.getNodeAttribute(node, 'claimType') ?? '')),
     yStretch: stretch.y,
+    xStretch: stretch.x,
+    pack: packOf(active()),
+    only: only && stood,
   };
 }
 
@@ -178,7 +199,7 @@ function stretchAxis(
   return { stretch: stretched, applied };
 }
 
-/** layOut puts the drawn graph on the axis at these stretches. */
+/** layOut puts the drawn graph on the axis at these stretches, packing what a view packs. */
 function layOut(g: DirectedGraph, stretch: Stretch): void {
   const scale = axis;
   if (!scale) return;
@@ -188,6 +209,8 @@ function layOut(g: DirectedGraph, stretch: Stretch): void {
     classOf: (node) => String(g.getNodeAttribute(node, 'cls') ?? ''),
     subOf: (node) => subtypeOf(String(g.getNodeAttribute(node, 'claimType') ?? '')),
     yStretch: stretch.y,
+    xStretch: stretch.x,
+    pack: packOf(active()),
   });
 }
 

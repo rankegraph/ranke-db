@@ -99,19 +99,6 @@ export function hexDump(bytes: Uint8Array): string {
   return lines.join('\n');
 }
 
-/** isTextual reports whether an encoding says the bytes are meant to be read as characters. */
-export function isTextual(encoding: string | undefined): boolean {
-  if (!encoding) return false;
-  return (
-    encoding.startsWith('text/') ||
-    encoding === 'application/json' ||
-    encoding === 'application/xml' ||
-    encoding.endsWith('+json') ||
-    encoding.endsWith('+xml')
-  );
-}
-
-/** asText decodes bytes as UTF-8, replacing anything that is not. */
-export function asText(bytes: Uint8Array): string {
-  return new TextDecoder('utf-8', { fatal: false }).decode(bytes);
-}
+// Whether bytes are text, and how they decode, is a fact about content rather than about the
+// interface reading it — so both live with the bytes, re-exported here for the panes.
+export { asText, isTextual } from '../core/content.ts';

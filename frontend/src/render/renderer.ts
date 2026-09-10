@@ -12,10 +12,11 @@ import Sigma from 'sigma';
 import { createEdgeArrowProgram } from 'sigma/rendering';
 import type { Settings } from 'sigma/settings';
 import type { DirectedGraph } from 'graphology';
-import { contentOf } from '../core/content.ts';
+import { captionText, claimText } from '../core/detail.ts';
 import { brighten } from '../core/graph/build.ts';
 import { graph } from '../core/graph/universe.ts';
 import { inScope } from '../core/session.ts';
+import { labelEveryClaim } from '../core/provenance.ts';
 import { useExplorer, activeView } from '../core/store.ts';
 import type { ViewState } from '../core/store.ts';
 import { applyBound, holdCamera, panIntoView, zoomToBox } from './camera.ts';
@@ -44,22 +45,10 @@ const PREVIEW_CONTENT_CHARS = 200;
 /**
  * contentSnippet is the hover tooltip's second line: a prefix of already-read text content.
  * Never fetches — a sweeping pointer must not trigger a request per node — so unread or
- * non-text content quotes nothing.
+ * non-text content quotes nothing (-> core/detail claimText).
  */
 function contentSnippet(id: string): string {
-  const encoding = graph().getNodeAttribute(id, 'encoding') as string | undefined;
-  const textual =
-    !!encoding &&
-    (encoding.startsWith('text/') ||
-      encoding === 'application/json' ||
-      encoding === 'application/xml' ||
-      encoding.endsWith('+json') ||
-      encoding.endsWith('+xml'));
-  if (!textual) return '';
-  const bytes = contentOf(id);
-  if (!bytes) return '';
-  const text = new TextDecoder('utf-8', { fatal: false }).decode(bytes).trim();
-  if (text.length === 0) return '';
+  const text = claimText(id);
   return text.length > PREVIEW_CONTENT_CHARS ? `${text.slice(0, PREVIEW_CONTENT_CHARS)}…` : text;
 }
 
@@ -160,10 +149,13 @@ function sigmaSettings(): Partial<Settings> {
       if (!visible) return { ...data, hidden: true };
       if (counting) admittedNodes++;
       const { selected, hovered } = useExplorer.getState().selection;
+      // A small closure is read closely, so every claim in it keeps its caption — including
+      // while another is selected, where a graph view blanks them (-> core/provenance).
+      const captionAll = labelEveryClaim(view);
       let out = data;
       // A selected claim's caption steps ahead of every other; cheap since the label-density
       // budget already bounds how many were showing (-> labelBearingNodes), not graph size.
-      if (selected && node !== selected) out = { ...out, label: '' };
+      if (selected && node !== selected && !captionAll) out = { ...out, label: '' };
       const own = String(out.color ?? '#999999');
       if (node === selected) {
         // forceLabel bypasses Sigma's own size/density gate, so the selected claim's caption
@@ -173,7 +165,14 @@ function sigmaSettings(): Partial<Settings> {
       if (node === hovered) {
         return { ...out, color: brighten(own, NODE_HOVERED_BRIGHTEN), highlighted: true, zIndex: 1 };
       }
-      return out;
+      // forceLabel bypasses the size and density gates, which is what "every claim" means, and
+      // the caption's second line is what the claim says (-> core/detail captionText). The
+      // drawer splits on the newline; Sigma's own label drawer would stop at it.
+      if (!captionAll) return out;
+      const says = captionText(node);
+      if (!says) return { ...out, forceLabel: true };
+      // wideLabel buys the room the text needs; the stock cap would cut it to a few words.
+      return { ...out, forceLabel: true, wideLabel: true, label: `${out.label ?? ''}\n${says}` };
     },
     edgeReducer: (edge, data) => {
       const view = activeView(useExplorer.getState());
