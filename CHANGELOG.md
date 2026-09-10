@@ -4,6 +4,16 @@ What each release changed for someone depending on this repository.
 
 ## Unreleased
 
+### Changed
+
+- A claim signed under a key that `ranke-client contributor add` admitted carries height 2,
+  where one signed under a branch creator's key carries 1: the admission sits above the
+  contributor claim admitting it, and every claim sits above what it references
+  (`V-HEIGHT`). A client reads the height off the claim it references —
+  `ranke.HeightOf(contributorClaim, refs...)`, or `WithAutoHeight(ctx, u)` where it holds a
+  Universe — since a hardcoded height builds and is then refused at verification, the
+  server re-deriving it. `contributor add` reads it that way.
+
 ## v1.27.0 — 2026-09-10
 
 ### Added
