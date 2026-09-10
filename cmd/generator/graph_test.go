@@ -34,7 +34,7 @@ func TestIdentityIsReproducible(t *testing.T) {
 }
 
 // TestExampleGraphHasRealProvenance checks the shape rather than the bytes: one contribution
-// per branch, and in the first the four claims whose heights follow from what each cites — 1
+// per branch, and in the first the four claims whose heights follow from what each references — 1
 // for the sources, 2 for the derivation, 3 for the entity.
 func TestExampleGraphHasRealProvenance(t *testing.T) {
 	g := newTestGrower(t)

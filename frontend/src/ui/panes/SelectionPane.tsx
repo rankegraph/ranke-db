@@ -159,7 +159,7 @@ export function SelectionPane() {
               ][])
             : []),
           ['degree', detail.degree.toLocaleString('en-US')],
-          ['cited by', detail.citedBy.toLocaleString('en-US')],
+          ['referenced by', detail.citedBy.toLocaleString('en-US')],
         ]}
       />
 
@@ -173,17 +173,17 @@ export function SelectionPane() {
 
       <h2>references</h2>
       <p className="note">
-        What this claim cites — its own edges. Both halves of a row are things to ask about: the
+        What this claim references — its own edges. Both halves of a row are things to ask about: the
         edge on the left, the claim it points at on the right.
       </p>
       <RefList rows={detail.references} arrow="→" empty="An initial node — it references nothing." />
 
-      <h2>citations</h2>
+      <h2>referenced by</h2>
       <p className="note">
-        What cites this claim — edges belonging to other claims, drawn in pink while this one is
-        selected. A claim cannot know them when it is written, so they accrue.
+        What references this claim — edges belonging to other claims, drawn in pink while this one
+        is selected. A claim cannot know them when it is written, so they accrue.
       </p>
-      <RefList rows={detail.citations} arrow="←" empty="Nothing loaded cites this claim." />
+      <RefList rows={detail.citations} arrow="←" empty="Nothing loaded references this claim." />
     </div>
   );
 }

@@ -412,7 +412,7 @@ export function degreeStats(graph: DirectedGraph): DegreeStats {
 /**
  * sizeByDegree scales node radius by degree so hubs read as hubs — semantic hubs, not
  * provenance ones. A `contribution/*` claim's degree is an artefact of the ADT (a signing key
- * cited by every claim it signed, a branch table chaining every revision before it) rather
+ * referenced by every claim it signed, a branch table chaining every revision before it) rather
  * than a fact about what it says, so scaling by it would let the busiest key dwarf every
  * entity and relation on the canvas. Those claims are excluded from the degree range and held
  * at a fixed, clickable size instead; every other class scales across the full range as before.

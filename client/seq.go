@@ -91,14 +91,14 @@ func splitCBORSeq(r io.Reader) ([][]byte, error) {
 	}
 }
 
-// DecodeRecord reads one record as the QueryResult ranke-go describes a result with, so
-// a caller switches on Kind once, as an in-process reader does. A serialized claim comes
+// decodeRecord reads one record as the QueryResult ranke-go describes a result with, so
+// Query switches on Kind once, as an in-process reader does. A serialized claim comes
 // back as bytes under KindClaimEncoded, ranke-go exporting no reader for that form.
 //
 // The reading mirrors ranke-ts's decodeResultRecord: payload inspection, which
 // `R-QSTREAM` would rather forbid and the wire carries no tag to replace. Mirroring the
 // tested reference is what lets the explorer and this move together when the tag lands.
-func DecodeRecord(raw []byte, enc ranke.ResultEncoding) (ranke.QueryResult, error) {
+func decodeRecord(raw []byte, enc ranke.ResultEncoding) (ranke.QueryResult, error) {
 	if len(raw) == 0 {
 		return ranke.QueryResult{}, ranke.WithDetail(ErrUnknownFraming, "an empty record carries nothing")
 	}

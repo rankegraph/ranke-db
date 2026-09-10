@@ -23,7 +23,7 @@
 
 import { DirectedGraph } from 'graphology';
 
-/** The attribute a claim carries when it cites, or is cited by, something out of the window. */
+/** The attribute a claim carries when it references, or is referenced by, something out of the window. */
 export const OUTSIDE_ATTR = 'outside';
 
 export interface Window {

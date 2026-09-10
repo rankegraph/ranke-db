@@ -49,7 +49,7 @@ func TestRefusalsFromTheRealEndpoint(t *testing.T) {
 
 	t.Run("invalid", func(t *testing.T) {
 		s, c := serve(t)
-		// The note cites a contributor claim that neither the archive holds nor the
+		// The note references a contributor claim that neither the archive holds nor the
 		// stream carries, so the closure cannot resolve the signature over it.
 		_, err := c.Contribute(ctx, s.Universe, testBranch, []ranke.Claim{s.note(t, "orphaned", storyTime)})
 		assertCategory(t, err, client.ErrInvalid, core.CatInvalid)

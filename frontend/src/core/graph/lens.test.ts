@@ -56,10 +56,10 @@ test('an edge leaving the window is counted on the claim, not followed', () => {
   assert.ok(!lens.graph.hasEdge('e5'), 'an edge reaching out of the view was drawn');
   assert.equal(lens.graph.order, lens.inside, 'the lens is exactly the window');
 
-  // c5 cites c4 below the window; c9 is cited by c10 above it. Each knows.
+  // c5 references c4 below the window; c9 is referenced by c10 above it. Each knows.
   assert.equal(lens.graph.getNodeAttribute('c5', OUTSIDE_ATTR), 1);
   assert.equal(lens.graph.getNodeAttribute('c9', OUTSIDE_ATTR), 1);
-  // A claim wholly inside cites nothing out of view.
+  // A claim wholly inside references nothing out of view.
   assert.equal(lens.graph.getNodeAttribute('c7', OUTSIDE_ATTR), 0);
   assert.equal(lens.leaving, 2);
 });

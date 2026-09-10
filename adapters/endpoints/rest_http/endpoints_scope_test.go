@@ -400,7 +400,7 @@ func testContributor(t *testing.T) (ranke.Contributor, ed25519.PrivateKey, ranke
 	return self, priv, claim
 }
 
-// signedClaim signs one inline-text claim. Height 1: it cites its contributor, an initial
+// signedClaim signs one inline-text claim. Height 1: it references its contributor, an initial
 // node at 0, and a referencing claim must declare its height.
 func signedClaim(t *testing.T, self ranke.Contributor, priv ed25519.PrivateKey, typ, text string) ranke.Claim {
 	t.Helper()

@@ -4,6 +4,50 @@ What each release changed for someone depending on this repository.
 
 ## Unreleased
 
+### Added
+
+- `ranke-client contributor add <branch> --pubkey <hex|PEM> --signing-key <spec>` admits a
+  second key to a branch. A branch admits the keys its own closure holds a
+  `contribution/contributor` claim for (`V-SIG`), and `branch create` puts only the
+  creator's there; this contributes a claim carrying the new pubkey, attributed to the
+  contributor the signing key already holds on that branch and signed under it. Needs **R**
+  on the branch to find that claim and **C** on the branch to add the new one — no
+  `$`-target. A key the branch already admits is reported and left alone.
+- `ranke-client contributor list --branch <name>` lists the keys one branch admits, with the
+  windows binding there (`R-C3LIMIT`). It needs **R** on that branch alone, where the
+  listing it defaults to — the whole archive — needs **R** on `$archive`. A listing now
+  names the scope it answers for when it finds nothing.
+### Changed
+
+- `client.Client.Contributors(ctx, scope)` and `client.Client.Expiries(ctx, scope)` take the
+  scope to read: a branch name, or `client.ScopeArchive` for what they read before. The
+  `client.Scope` they take is the one `GetClaim` already takes. `client.ScopeUniverse` is
+  refused with the new `client.ErrUniverseNeedsHead`, a closure read there requiring a head
+  (`R-QHEAD`), and an empty scope with `ranke.ErrWireNoBranch`.
+- `client.ContributorsFor` is now the method `client.Client.ContributorsFor(ctx, scope,
+  pubkey)`: it reads the scope and returns the claims carrying that pubkey, where the
+  function took a slice the caller had read. A key with no claim there comes back as an
+  empty result, and a read narrowed to no key at all as `client.ErrNoPubkey`.
+
+### Removed
+
+- `client.DecodeRecord`. Reading a record of a result sequence is the step
+  `client.Client.Query` takes between `QueryRaw` and its own decoded results, and it is
+  where it belongs now. For the records untouched, call `QueryRaw` and read them by the
+  framing it returns.
+
+### Fixed
+
+- The explorer holds the camera between a floor and a ceiling. The zoom-out ceiling was read
+  off the drawn width alone, so an archive whose claims share one instant — a picture one
+  column wide — set a ceiling that pinned the camera a thousandfold in, with every node drawn
+  thirty times its size and the strata a smear. It is now read off whichever axis covers the
+  canvas better. Zooming in stops where a node reaches four times its own radius, so a marked
+  box no longer ends in a single disc.
+- A first look at an archive fits the whole time axis across the canvas. Where the archive had
+  no remote outlier to trim, the fit skipped altogether, leaving a handful of claims minutes
+  apart drawn as a huddle a dozen pixels wide in the middle of an empty canvas.
+
 ## v1.26.0 — 2026-09-10
 
 ### Changed

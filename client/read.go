@@ -115,7 +115,7 @@ func (c *Client) Query(ctx context.Context, q ranke.Query) ([]ranke.QueryResult,
 	}
 	out := make([]ranke.QueryResult, 0, len(records))
 	for _, raw := range records {
-		result, err := DecodeRecord(raw, enc)
+		result, err := decodeRecord(raw, enc)
 		if err != nil {
 			return nil, err
 		}
