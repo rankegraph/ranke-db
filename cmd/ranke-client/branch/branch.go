@@ -16,6 +16,6 @@ func Cmd(inst *instance.Instance) *cobra.Command {
 		Use:   "branch",
 		Short: "Work with the archive's branches",
 	}
-	c.AddCommand(createCmd(inst))
+	c.AddCommand(listCmd(inst), createCmd(inst))
 	return c
 }

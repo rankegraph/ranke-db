@@ -4,6 +4,58 @@ What each release changed for someone depending on this repository.
 
 ## Unreleased
 
+## v1.25.0 — 2026-09-10
+
+### Added
+
+- `client.Client.ResolveContributor(ctx, keypair, at, pick)` answers the contributor a
+  signing key signs as: the `contribution/contributor` claim the archive already holds
+  for that pubkey, or a freshly minted one where the key has never contributed. It
+  refuses rather than guessing where the answer is not single — `ErrContributorLapsed`
+  where every claim over the key is outside its validity window at `at` (`R-C4KEY`),
+  `ErrContributorAmbiguous` where several are valid at once, `ErrNoSuchContributor`
+  where `pick` names a claim the key does not carry, and `ErrContributorUnresolved`
+  where the read was forbidden. Needs the **R** right on `$archive`.
+- `client.RegisterContributor(keypair)` mints the claim for a first-time contributor,
+  epoch-dated so one key yields one id however often a caller runs.
+- `client.Client.Contributors(ctx)` and `client.Client.Expiries(ctx)` read the archive's
+  `contribution/contributor` and `contribution/expiry` claims;
+  `client.ContributorsFor(claims, pubkey)` picks a key's own out of them.
+- `client.ContributorWindow`, with `client.ContributorWindowOf` and
+  `client.ContributorWindows`, reads a contributor key's validity as `R-DEXPIRY` fixes
+  it: the bounds the claim states, shortened by the earliest `contribution/expiry` edge
+  naming it. `Admits(at)` answers the question `R-C4KEY` asks of every claim it signs.
+- `ranke-client branch list` reports every branch the table holds with the head it
+  resolves to, and the branch-table head above them, that being the id an `$archive`
+  query or grant is held against. `--deep` adds each head's height and when the branch
+  last moved, one request per branch. Needs the **R** right on `$branches`.
+- `ranke-client contributor list` reports each contributor the archive holds — id,
+  pubkey, when it was added, its key window and whether that window admits now — and
+  names any pubkey carried by more than one claim, which is how a forked identity
+  becomes visible. `--signing-key` narrows it to one key's own.
+- `ranke-client branch create --contributor <id>` names which contributor claim to sign
+  as, for a key that carries several. `--register-identity` registers the key without
+  reading the archive first, for an account holding no **R** on `$archive`.
+
+### Changed
+
+- `ranke-client branch create` now also wants the **R** right on `$archive`, to resolve
+  the signing key against the contributors already registered there. An account without
+  it is refused, naming both the grant to add and `--register-identity`.
+
+### Fixed
+
+- `ranke-client branch create` contributed a second `contribution/contributor` claim for
+  its signing key on every run, so a key the archive had already registered — the
+  founder key, registered at founding — ended up with two contributor claims over one
+  pubkey, leaving every claim signed under it ambiguous as to which contributor it
+  resolves through. The key is now resolved against the archive and the registered claim
+  referenced across the branch boundary, a registration travelling only for a key the
+  archive does not hold. The two claims could never have converged by agreeing on a
+  date: a founding contributor is attested by the server, carrying a
+  `contribution/contributor` edge and a height above 0, where a client-minted one is an
+  initial claim — different references, so different ids whatever they are dated.
+
 ## v1.24.0 — 2026-09-10
 
 ### Added
