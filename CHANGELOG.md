@@ -4,6 +4,8 @@ What each release changed for someone depending on this repository.
 
 ## Unreleased
 
+## v1.21.0 — 2026-09-10
+
 ### Changed
 
 - ranke-go v0.30.0. Founding now binds the archive's first contributor to a branch,
