@@ -4,6 +4,8 @@ What each release changed for someone depending on this repository.
 
 ## Unreleased
 
+## v1.22.0 — 2026-09-10
+
 ### Added
 
 - `ranke-client`, a second binary for the client half. It holds a contributor key and
