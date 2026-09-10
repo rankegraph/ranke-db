@@ -227,7 +227,7 @@ func TestAKeyIsAdmittedByOneTheBranchHolds(t *testing.T) {
 	admission, err := ranke.NewClaim(ranke.NodeContributor, signing).
 		WithInlineContent(newcomer.Pubkey).
 		WithEncoding(ranke.EncodingOctetStream).
-		WithHeight(ranke.HeightOf(signing)).
+		WithHeightResolver(ctx, ranke.HeightsFrom(signing)).
 		Sign()
 	if err != nil {
 		t.Fatalf("sign the admission: %v", err)

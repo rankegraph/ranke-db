@@ -375,6 +375,19 @@ func mapLibError(err error) error {
 	}
 }
 
+// mapVerifyError resolves a step-4 failure, where verification judges the submitted claims
+// against the base (`R-C4SEAL`). A rule it names is the contribution's defect and the
+// caller's to correct, so what mapLibError leaves uncategorised is invalid rather than
+// internal, and the message travels: it names the claim and the rule (`V-…`). A category
+// mapLibError does know keeps it — a stack that cannot answer is the server's own fault.
+func mapVerifyError(err error) error {
+	mapped := mapLibError(err)
+	if Categorize(mapped) != CatInternal {
+		return mapped
+	}
+	return fmt.Errorf("%w: %v", ErrInvalidRequest, err)
+}
+
 // readCloser adapts a reader the library handed back, which may or may not own
 // resources, to the Close the stream contract requires.
 func readCloser(r io.Reader) io.ReadCloser {
@@ -437,7 +450,7 @@ func (c *Core) contribute(ctx context.Context, req *Request) (Stream, error) {
 	}
 	verified, err := contribution.CompleteAndVerify(ctx)
 	if err != nil {
-		return nil, mapLibError(err)
+		return nil, mapVerifyError(err)
 	}
 	mergable, err := verified.Persist(ctx)
 	if err != nil {

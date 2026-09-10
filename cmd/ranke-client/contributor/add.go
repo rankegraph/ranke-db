@@ -103,7 +103,7 @@ func add(
 	if err != nil {
 		return fmt.Errorf("read the contributor claim %s: %w", mine[0].ID(), err)
 	}
-	claim, err := admission(signing, pubkey)
+	claim, err := admission(ctx, signing, pubkey)
 	if err != nil {
 		return err
 	}
@@ -119,14 +119,15 @@ func add(
 }
 
 // admission is the claim that states pubkey, attributed to signing and signed under its key,
-// so what it registers is a key other than the one signing (`V-SIG`). Its height comes from
-// the claim it references, which carries its own (`V-HEIGHT`): a key admitted to the branch
-// sits above the one that admitted it, and the verifier re-derives what a guess would miss.
-func admission(signing ranke.Contributor, pubkey []byte) (ranke.Claim, error) {
+// so what it registers is a key other than the one signing (`V-SIG`). The height is resolved
+// against the claim it references, which carries its own (`V-HEIGHT`): a key admitted to the
+// branch sits above the one that admitted it, and a reference the resolver was not given is
+// reported rather than counted as 0.
+func admission(ctx context.Context, signing ranke.Contributor, pubkey []byte) (ranke.Claim, error) {
 	claim, err := ranke.NewClaim(ranke.NodeContributor, signing).
 		WithInlineContent(pubkey).
 		WithEncoding(ranke.EncodingOctetStream).
-		WithHeight(ranke.HeightOf(signing)).
+		WithHeightResolver(ctx, ranke.HeightsFrom(signing)).
 		Sign()
 	if err != nil {
 		return nil, fmt.Errorf("sign a contributor claim attributed to %s: %w", signing.ID(), err)

@@ -4,6 +4,23 @@ What each release changed for someone depending on this repository.
 
 ## Unreleased
 
+### Changed
+
+- ranke-go moves to v0.33.0, where a claim's height is answered by a resolver:
+  `WithHeightResolver(ctx, ranke.HeightsFrom(refs...))` derives it from the claims in hand
+  and reports a reference it was not given, where `WithHeight(ranke.HeightOf(refs...))`
+  counted an omitted one as 0 and built a claim the server refuses. `ranke-client
+  contributor add` and the generator build that way now. `WithHeight` keeps its signature,
+  and a claim's resolved height is what it always was, so ids are untouched.
+
+### Fixed
+
+- A contribution a rule refuses is answered `400 invalid`, carrying what verification said:
+  the claim's id, the rule (`V-HEIGHT`, `V-SIG`, `V-MONO`, …), and the value it wanted. It
+  was answered `500 internal`, which told a client to retry a fault of the server's where
+  the claim was its own to correct — the refusal itself was always clean, atomic with the
+  head unmoved. A stack that cannot answer at all is still `internal`.
+
 ## v1.27.1 — 2026-09-10
 
 ### Changed

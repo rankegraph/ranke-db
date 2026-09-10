@@ -437,3 +437,38 @@ func TestContributeGatesBranchCreation(t *testing.T) {
 		t.Fatalf("writing an existing branch needed the creation right: %v", err)
 	}
 }
+
+// TestContributeNamesAVerificationFailureAsTheCallers: a claim breaking a rule is the
+// contribution's defect, so the refusal is invalid and carries what verification said —
+// which claim, and which rule. It answered internal before, dressing a malformed claim as
+// a fault of the server's own.
+func TestContributeNamesAVerificationFailureAsTheCallers(t *testing.T) {
+	c := newStack(t)
+	self, priv, selfClaim := newContributor(t, c.store)
+
+	// A height no reference supports: the contributor sits at 0, so 1 is the only value
+	// `V-HEIGHT` admits, and the verifier re-derives it.
+	claim, err := ranke.NewClaim("source/letter", self).
+		WithInlineContent([]byte("a claim carrying the wrong height")).
+		WithEncoding(ranke.EncodingOctetStream).
+		WithHeight(contributorHeight + 5).
+		Sign(priv)
+	if err != nil {
+		t.Fatalf("sign claim: %v", err)
+	}
+
+	body := writeContribution(t, "main", selfClaim, claim)
+	_, err = c.Handle(context.Background(), &Request{
+		Op: OpClaimContribute, Body: bytes.NewReader(body),
+	})
+	if !errors.Is(err, ErrInvalidRequest) {
+		t.Fatalf("err = %v, want ErrInvalidRequest", err)
+	}
+	if got := Categorize(err); got != CatInvalid {
+		t.Fatalf("category = %q, want %q", got, CatInvalid)
+	}
+	if got := err.Error(); !strings.Contains(got, "height") {
+		t.Errorf("the refusal reads %q, and a caller correcting the claim needs the rule "+
+			"verification named", got)
+	}
+}

@@ -65,14 +65,12 @@ type grower struct {
 	made      []made
 }
 
-// signer is an identity claims are attributed to: the contributor claim naming its key, the
-// height that claim sits at, and the Contributor that signs with it. The root grower is one;
-// attest derives the others.
+// signer is an identity claims are attributed to: the contributor claim naming its key, and
+// the Contributor that signs with it. The root grower is one; attest derives the others.
 type signer struct {
-	name   string
-	claim  ranke.Claim
-	height uint64
-	as     ranke.Contributor
+	name  string
+	claim ranke.Claim
+	as    ranke.Contributor
 }
 
 // attest derives an identity from a name and has the root vouch for it: the claim declares
@@ -100,12 +98,13 @@ func (g *grower) attest(ctx context.Context, name string, of made) (*signer, err
 		return nil, fmt.Errorf("edge to %s: %w", of.claim.ID(), err)
 	}
 	// Signed by the root, whose key the builder takes from the contributor it is attributed
-	// to. Height climbs past the actor it cites, the root being an initial node at 0.
+	// to. The height is resolved against both claims it reaches: the actor it cites and the
+	// root that signs it.
 	claim, err := ranke.NewClaim(ranke.NodeTypeContributor, g.self).
 		WithInlineContent(pub).
 		WithEncoding(ranke.EncodingOctetStream).
 		WithCreatedAt(g.at).
-		WithHeight(of.height + 1).
+		WithHeightResolver(ctx, ranke.HeightsFrom(of.claim, g.selfClaim)).
 		WithEdges(edge).
 		Sign()
 	if err != nil {
@@ -118,13 +117,13 @@ func (g *grower) attest(ctx context.Context, name string, of made) (*signer, err
 	if err != nil {
 		return nil, fmt.Errorf("bind contributor %q: %w", name, err)
 	}
-	return &signer{name: name, claim: claim, height: of.height + 1, as: as}, nil
+	return &signer{name: name, claim: claim, as: as}, nil
 }
 
 // rootSigner is the grower's own identity as a signer, so one helper writes claims for
 // either the root or an attested actor.
 func (g *grower) rootSigner() *signer {
-	return &signer{name: "root", claim: g.selfClaim, height: 0, as: g.self}
+	return &signer{name: "root", claim: g.selfClaim, as: g.self}
 }
 
 // cite is one edge a claim carries: what it reaches, and how. The type is the edge's own —
@@ -174,12 +173,13 @@ type spec struct {
 	at       time.Time // explicit schedule (release.go); zero rides the ambient clock
 }
 
-// write signs one claim from a spec and remembers it. Height is explicit because a claim
-// citing others must declare it (§4.1), and it counts the contributor edge too: a claim
-// signed by an attested identity sits above that identity's own claim.
+// write signs one claim from a spec and remembers it. The height is resolved against every
+// claim it reaches — the contributor it is signed by included, since a claim signed by an
+// attested identity sits above that identity's own claim.
 func (g *grower) write(s spec) (made, error) {
 	edges := make([]ranke.Edge, 0, len(s.cites))
-	height := s.by.height
+	refs := make([]ranke.Claim, 0, len(s.cites)+1)
+	refs = append(refs, s.by.claim)
 	for _, c := range s.cites {
 		edge, err := ranke.NewEdge(ranke.EdgeConfig{
 			Reference:         c.to.claim.ID(),
@@ -191,9 +191,8 @@ func (g *grower) write(s spec) (made, error) {
 			return made{}, fmt.Errorf("edge to %s: %w", c.to.claim.ID(), err)
 		}
 		edges = append(edges, edge)
-		height = max(height, c.to.height)
+		refs = append(refs, c.to.claim)
 	}
-	height++
 
 	at := s.at
 	if at.IsZero() {
@@ -207,7 +206,7 @@ func (g *grower) write(s spec) (made, error) {
 		WithInlineContent(s.content).
 		WithEncoding(encoding).
 		WithCreatedAt(at).
-		WithHeight(height).
+		WithHeightResolver(context.Background(), ranke.HeightsFrom(refs...)).
 		WithEdges(edges...)
 	for key, value := range s.fields {
 		b = b.WithField(key, value)
@@ -222,16 +221,15 @@ func (g *grower) write(s spec) (made, error) {
 	} else if at.After(g.at) {
 		g.at = at
 	}
-	m := made{claim: claim, height: height, branch: s.branch}
+	m := made{claim: claim, branch: s.branch}
 	g.made = append(g.made, m)
 	return m, nil
 }
 
-// made pairs a signed claim with the height a claim citing it must climb past, and the
-// branch holding it — a reference may only reach within its own branch's closure.
+// made pairs a signed claim with the branch holding it — a reference may only reach within
+// its own branch's closure.
 type made struct {
 	claim  ranke.Claim
-	height uint64
 	branch string
 }
 
