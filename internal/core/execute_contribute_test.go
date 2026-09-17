@@ -35,7 +35,7 @@ func newContributor(t *testing.T, u ranke.Universe) (ranke.Contributor, ed25519.
 	claim, err := ranke.NewClaim(ranke.NodeContributor, nil).
 		WithInlineContent(encoded).
 		WithEncoding(ranke.EncodingOctetStream).
-		WithCreatedAt(time.Unix(0, 0).UTC()).
+		WithCreatedAt(time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)).
 		Sign(priv)
 	if err != nil {
 		t.Fatalf("sign contributor claim: %v", err)

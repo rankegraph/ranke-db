@@ -21,7 +21,7 @@ func TestAdvanceClockSteersADevStack(t *testing.T) {
 	ctx := context.Background()
 	_, c := serve(t)
 
-	at := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
+	at := time.Date(2026, 6, 1, 12, 0, 0, 0, time.UTC)
 	clock, err := c.Dev().AdvanceClock(ctx, at)
 	if err != nil {
 		t.Fatalf("AdvanceClock: %v", err)
@@ -66,8 +66,8 @@ func TestAdvanceClockPastFollowsTheStory(t *testing.T) {
 	ctx := context.Background()
 	s, c := serve(t)
 
-	early := time.Date(2026, 3, 1, 9, 0, 0, 0, time.UTC)
-	late := time.Date(2026, 3, 1, 17, 0, 0, 0, time.UTC)
+	early := time.Date(2026, 6, 1, 9, 0, 0, 0, time.UTC)
+	late := time.Date(2026, 6, 1, 17, 0, 0, 0, time.UTC)
 	claims := []ranke.Claim{s.note(t, "morning", early), s.note(t, "evening", late)}
 
 	if latest := client.MaxCreatedAt(claims); !latest.Equal(late) {

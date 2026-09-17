@@ -20,7 +20,7 @@ import (
 
 // storyTime is where a case's claims are dated, so the archive's recorded times follow
 // the story rather than wall time.
-var storyTime = time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
+var storyTime = time.Date(2026, 6, 1, 12, 0, 0, 0, time.UTC)
 
 // TestFramingSplitsBothEncodings pins the split itself. A json-seq record opens with
 // RS and ends with LF, a cbor-seq record is bare concatenation, and neither delimiter

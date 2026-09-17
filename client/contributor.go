@@ -12,6 +12,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/rankegraph/ranke-go"
 )
@@ -43,6 +44,34 @@ func (c *Client) ContributorsFor(ctx context.Context, scope Scope, pubkey []byte
 		}
 	}
 	return carrying, nil
+}
+
+// ContributorFor returns the registration pubkey signs under at `at`: of the claims carrying
+// that key, the first whose window admits the instant (`R-C4KEY`). Picking another among
+// several is the caller's, over the reads this composes (-> ContributorsFor, Expiries).
+func (c *Client) ContributorFor(ctx context.Context, scope Scope, pubkey []byte, at time.Time) (ranke.Claim, error) {
+	held, err := c.ContributorsFor(ctx, scope, pubkey)
+	if err != nil {
+		return nil, err
+	}
+	if len(held) == 0 {
+		return nil, fmt.Errorf("%w: the key is registered nowhere in %s", ErrNoLiveContributor, scope)
+	}
+	expiries, err := c.Expiries(ctx, scope)
+	if err != nil {
+		return nil, err
+	}
+	windows, err := ContributorWindows(held, expiries)
+	if err != nil {
+		return nil, err
+	}
+	for _, claim := range held {
+		if windows[claim.ID().String()].Admits(at) {
+			return claim, nil
+		}
+	}
+	return nil, fmt.Errorf("%w: %d registration(s) carry it, none admitting %s",
+		ErrNoLiveContributor, len(held), at.UTC().Format(time.RFC3339))
 }
 
 // Expiries returns the `contribution/expiry` claims scope holds, whose edge shortens a key's

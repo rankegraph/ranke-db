@@ -26,7 +26,7 @@ func bounded(t *testing.T, key ranke.Keypair, from, until time.Time) ranke.Claim
 	b := ranke.NewClaim(ranke.NodeContributor, nil).
 		WithInlineContent(key.Pubkey).
 		WithEncoding(ranke.EncodingOctetStream).
-		WithCreatedAt(time.Unix(0, 0).UTC())
+		WithCreatedAt(time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC))
 	if !from.IsZero() {
 		b = b.WithField(ranke.FieldPubkeyValidFrom, ranke.FormatTimestamp(from))
 	}

@@ -219,6 +219,8 @@ github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c/go.mod h1:7rwL4CYBLnjL
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/rankegraph/ranke-go v0.34.0 h1:SCZ19bQTvlJ5RRLoWsqss9/4mYQlXbg7WkGQ/7MBWDs=
 github.com/rankegraph/ranke-go v0.34.0/go.mod h1:YoKwAPGvJMU1yzz9aVb8GfW6k+O6/KMlRWvcuhL4B4Y=
+github.com/rankegraph/ranke-go v0.35.0 h1:P/kieA1joirJFVxOujZef0w6PUANK7YrVrGYslOL9tU=
+github.com/rankegraph/ranke-go v0.35.0/go.mod h1:YoKwAPGvJMU1yzz9aVb8GfW6k+O6/KMlRWvcuhL4B4Y=
 github.com/redis/go-redis/v9 v9.22.0 h1:laDvpYXTJtZLloinw1fA5Kqd6HAEH2XKxOkG/PDq2F0=
 github.com/redis/go-redis/v9 v9.22.0/go.mod h1:y2g0Wj8rQvuK0ELM+oxSudcLtC09JScs98I/X9gRWY4=
 github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec h1:W09IVJc94icq4NjY3clb7Lk8O1qJ8BdBEF8z0ibU0rE=

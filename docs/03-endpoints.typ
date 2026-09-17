@@ -138,7 +138,17 @@ Presented as `Authorization: Bearer …`.
 ]
 
 #item("account_claim")[
-  The claim carrying the account name. Default `sub`.
+  The claim carrying the account name, or — with `accounts` — the values it is
+  read through. Default `sub`.
+]
+
+#item("accounts")[
+  An array of `{"value": …, "account": …}`, read in order. Where an issuer
+  states roles rather than accounts, this is what turns one into the other: the
+  first entry whose `value` the claim carries names the account, so a subject
+  holding several roles acts as the one configured first and a claim naming
+  none authenticates nobody. The claim may hold a single value or a list of
+  them. Each `account` must be one the endpoint admits.
 ]
 
 #item("audience")[
@@ -148,6 +158,57 @@ Presented as `Authorization: Bearer …`.
 #item("issuer")[
   Held to, when set. Absent, the issuer goes unchecked.
 ]
+
+Letting a directory decide who holds an account is what `accounts` is for. An
+account here is a service account — `admin`, `ops`, the rights a job needs —
+and the applications that read and write a graph hold one each. People are the
+exception: an operator opening the explorer against raw data wants that access
+occasionally, and issuing each of them a key to keep is a secret more than the
+occasion is worth.
+
+An OpenID Connect provider answers this without either. Declare a role with the
+provider, against the registration this server's `audience` names, and assign
+whoever holds it. The token that arrives carries the role, `accounts` maps it
+to an account, and this configuration names no person at all: someone is
+granted access by being assigned the role, and loses it by being unassigned,
+neither of which is an edit here or a restart.
+
+#example[
+Microsoft Entra, with two roles declared on the API registration and assigned
+to people in the directory.
+
+#listing[
+```json
+{"type": "jwt", "algorithm": "RS256",
+ "jwks_url": "https://login.microsoftonline.com/TENANT/discovery/v2.0/keys",
+ "issuer":   "https://login.microsoftonline.com/TENANT/v2.0",
+ "audience": "api://APP-ID",
+ "account_claim": "roles",
+ "accounts": [{"value": "ranke-admin", "account": "admin"},
+              {"value": "ranke-ops",   "account": "ops"}]}
+```
+]
+
+Entra writes a subject's roles into `roles` as a list, so `account_claim` names
+it and the mapping reads it. An application authenticating as itself carries
+one value rather than a list — its client id in `azp` — and maps the same way,
+which is how a client application takes an account of its own.
+]
+
+Set `audience` to this server's own registration and `issuer` to the tenant
+that signs for it. A token minted for another resource verifies against the
+same keys and would otherwise be accepted here, which is the one mistake this
+arrangement invites.
+
+#note[The account governs what a request may do, and nothing else. A
+#gls("claim") carries its own #gls("contributor") key and is signed before it
+arrives, so who wrote what is on the claim itself — several people sharing one
+account leaves the graph's authorship exactly as precise as it was.]
+
+#warning[An account the endpoint does not admit (@sec:admit) authenticates and
+then gets nothing, so a name misspelled here reads as a working login that is
+refused everything. Check a mapped account against the endpoint's `admit`
+list.]
 
 === `macaroon` <sec:macaroon>
 

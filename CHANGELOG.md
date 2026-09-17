@@ -6,6 +6,24 @@ What each release changed for someone depending on this repository.
 
 ### Added
 
+- `client.ContributorFor(ctx, scope, pubkey, at)` — the registration a key signs under at an
+  instant: of the claims carrying that key, the first in arrival order whose window admits it
+  (`R-C4KEY`). It is the read an application makes before signing anything, which each caller
+  composed from `ContributorsFor`, `Expiries` and `ContributorWindows` until now.
+  `ErrNoLiveContributor` answers a key registered nowhere, and one whose registrations have
+  all lapsed, the message saying which — either way the caller registers the key again. Those
+  three reads stay exported for the choices this does not make: the latest registration, the
+  longest-lived, the one on a particular branch.
+
+- A `jwt` authenticator may map the values a claim carries onto accounts: `accounts`, an
+  ordered array of `{"value": …, "account": …}`, read with `account_claim` naming the claim
+  that carries them. It is how a directory decides who holds an account — an OpenID Connect
+  provider that issues roles (Microsoft Entra app roles, a group claim) states the role, and
+  this maps it to the service account the endpoint admits, so granting a person access is an
+  assignment with the provider rather than an edit here. The claim may hold one value or a
+  list; a subject holding several acts as the account configured first, and one holding none
+  of them is refused. Without `accounts` the claim names the account directly, as before.
+
 - The `vault` section's `azure` backend reads Azure Key Vault secrets. `url` is the Key
   Vault URI; a `vault(REF)` reference names a secret in it, `REF` alone reading the current
   version and `name/version` a pinned one. The identity is the ambient one — a managed
@@ -44,6 +62,19 @@ What each release changed for someone depending on this repository.
 
 ### Changed
 
+- ranke-go moves to v0.35.0, which refuses a claim dated before 2026-05-03 — the day the
+  design it conforms to was founded, so no earlier timestamp states a time a claim was
+  added. Nothing here dates a claim by a constant any more: the server's signing identity
+  carries the instant it was built, and under `--dev` the steerable clock reads real time
+  until a story steers it, where both stood at the Unix epoch. A restart therefore registers
+  a fresh contributor claim carrying the same key, the archive holding one per launch. A key
+  reaching the graph under several contributor claims is ordinary — it is how a claim whose
+  validity window was set wrong is corrected, by registering the key again beside it — and a
+  `pubkey` is content those claims carry rather than a name that identifies them. Date a claim about something older
+  with `dated` (`V-DATED`), which is the field for when a subject stems from.
+- A contribution referencing a claim neither the archive holds nor the stream carries is
+  answered `forbidden` where it was answered `invalid` (ranke-go v0.35.0). The refusal says
+  the reference is out of reach and nothing about whether it exists.
 - ranke-go moves to v0.34.0, where `V-SIGN` names a second signing scheme: a claim may
   be signed under ECDSA over P-256 (`ES256`, pubkey framed as the multicodec `p256-pub`)
   beside Ed25519. Ed25519 claims keep their ids and every backend here signs as it did, so

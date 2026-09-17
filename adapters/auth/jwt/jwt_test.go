@@ -279,3 +279,106 @@ func TestScheme(t *testing.T) {
 		t.Fatalf("Scheme() = %q, want bearer", got)
 	}
 }
+
+// newAuthWithRules builds the backend with an ordered value-to-account mapping over
+// claim, the shape a directory's roles arrive in.
+func newAuthWithRules(t *testing.T, pub ed25519.PublicKey, claim string, rules ...[2]string) *Auth {
+	t.Helper()
+	entries := make([]scope.Section, 0, len(rules))
+	for _, r := range rules {
+		entries = append(entries, scope.Literal(map[string]string{"value": r[0], "account": r[1]}))
+	}
+	a, err := New(context.Background(), scope.LiteralArray(
+		map[string]string{
+			"type": "jwt", "algorithm": "EdDSA",
+			"key": jwttest.PublicKeyPEM(t, pub), "account_claim": claim,
+		},
+		map[string][]scope.Section{"accounts": entries},
+	))
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	return a
+}
+
+// TestRoleClaimResolvesToAnAccount: an issuer that states roles rather than accounts —
+// Entra's app roles, a directory's groups — is read through the mapping, so several
+// people hold one service account and adding a person is an assignment there, not an
+// edit here.
+func TestRoleClaimResolvesToAnAccount(t *testing.T) {
+	pub, priv := jwttest.GenerateKey(t)
+	a := newAuthWithRules(t, pub, "roles", [2]string{"ranke-admin", "admin"}, [2]string{"ranke-ops", "ops"})
+
+	token := signWithExtra(t, priv, map[string]any{
+		"sub": "1ff1de77-4005-4d0b-b3f2-1cfbf82d6b23", "roles": []string{"ranke-ops"},
+		"exp": time.Now().Add(time.Hour).Unix(),
+	})
+	principal, err := a.Authenticate(context.Background(), token)
+	if err != nil {
+		t.Fatalf("Authenticate: %v", err)
+	}
+	if principal.Account != "ops" {
+		t.Fatalf("Account = %q, want %q", principal.Account, "ops")
+	}
+}
+
+// TestConfiguredOrderDecidesTheAccount: a subject holding both roles acts as the account
+// configured first, whatever order the issuer listed them in — precedence an operator
+// reads off the config, rather than one an issuer could change under them.
+func TestConfiguredOrderDecidesTheAccount(t *testing.T) {
+	pub, priv := jwttest.GenerateKey(t)
+	a := newAuthWithRules(t, pub, "roles", [2]string{"ranke-admin", "admin"}, [2]string{"ranke-ops", "ops"})
+
+	token := signWithExtra(t, priv, map[string]any{
+		"sub": "abc", "roles": []string{"ranke-ops", "ranke-admin"},
+		"exp": time.Now().Add(time.Hour).Unix(),
+	})
+	principal, err := a.Authenticate(context.Background(), token)
+	if err != nil {
+		t.Fatalf("Authenticate: %v", err)
+	}
+	if principal.Account != "admin" {
+		t.Fatalf("Account = %q, want %q", principal.Account, "admin")
+	}
+}
+
+// TestRoleOutsideTheMappingIsRejected: a valid token whose roles name no account
+// authenticates nobody. A directory full of roles this server never heard of must not
+// yield a principal, and an unassigned person is refused rather than admitted bare.
+func TestRoleOutsideTheMappingIsRejected(t *testing.T) {
+	pub, priv := jwttest.GenerateKey(t)
+	a := newAuthWithRules(t, pub, "roles", [2]string{"ranke-admin", "admin"})
+
+	for name, claims := range map[string]map[string]any{
+		"another app's role": {"roles": []string{"some-other-app-role"}},
+		"no roles at all":    {"sub": "abc"},
+		"an empty list":      {"roles": []string{}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			claims["exp"] = time.Now().Add(time.Hour).Unix()
+			_, err := a.Authenticate(context.Background(), signWithExtra(t, priv, claims))
+			if !errors.Is(err, autherr.ErrUnauthenticated) {
+				t.Fatalf("Authenticate: %v, want ErrUnauthenticated", err)
+			}
+		})
+	}
+}
+
+// TestASingleValuedClaimStillMaps: the mapping reads a plain string claim too, so an
+// application identity — whose azp is one value, not a list — maps the same way.
+func TestASingleValuedClaimStillMaps(t *testing.T) {
+	pub, priv := jwttest.GenerateKey(t)
+	a := newAuthWithRules(t, pub, "azp", [2]string{"6e74172b-be56-4843-9ff4-e66a39bb12e3", "explorer"})
+
+	token := signWithExtra(t, priv, map[string]any{
+		"azp": "6e74172b-be56-4843-9ff4-e66a39bb12e3",
+		"exp": time.Now().Add(time.Hour).Unix(),
+	})
+	principal, err := a.Authenticate(context.Background(), token)
+	if err != nil {
+		t.Fatalf("Authenticate: %v", err)
+	}
+	if principal.Account != "explorer" {
+		t.Fatalf("Account = %q, want %q", principal.Account, "explorer")
+	}
+}

@@ -15,6 +15,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -48,15 +49,20 @@ type Auth struct {
 	key          any         // set when configured with a static "key"
 	jwks         *jwksSource // set when configured with "jwks_url" instead
 	accountClaim string
+	accounts     []accountRule // empty when the claim names the account
 	audience     string
 	issuer       string
 }
+
+// accountRule maps one value the claim may carry onto an account. Rules are read in
+// config order, so precedence is the operator's, never the order an issuer listed in.
+type accountRule struct{ value, account string }
 
 // New builds the backend from "algorithm" (one of allowedAlgorithms) and exactly one
 // key source: "key" — PEM public key preferred (a leaked config then cannot mint
 // tokens, apikey's own standard for secrets), or a raw HMAC secret — or "jwks_url" for
 // a rotating issuer, refreshed every "jwks_refresh" (default 5m). "account_claim"
-// (default "sub"), "audience" and "issuer" (default empty, meaning unchecked) are optional.
+// (default "sub"), "accounts", "audience" and "issuer" are optional.
 func New(ctx context.Context, cfg scope.Section) (*Auth, error) {
 	algName, err := cfg.Get(ctx, "algorithm")
 	if err != nil {
@@ -95,6 +101,11 @@ func New(ctx context.Context, cfg scope.Section) (*Auth, error) {
 			return nil, errors.New("jwt: account_claim must not be empty")
 		}
 	}
+	if cfg.HasArray("accounts") {
+		if a.accounts, err = accountRules(ctx, cfg); err != nil {
+			return nil, err
+		}
+	}
 	if cfg.HasValue("audience") {
 		if a.audience, err = cfg.Get(ctx, "audience"); err != nil {
 			return nil, fmt.Errorf("jwt: audience: %w", err)
@@ -114,6 +125,30 @@ func New(ctx context.Context, cfg scope.Section) (*Auth, error) {
 		}
 	}
 	return a, nil
+}
+
+// accountRules reads "accounts", an array of {"value": …, "account": …}.
+func accountRules(ctx context.Context, cfg scope.Section) ([]accountRule, error) {
+	entries := cfg.GetArray("accounts")
+	rules := make([]accountRule, 0, len(entries))
+	for i, entry := range entries {
+		value, err := entry.Get(ctx, "value")
+		if err != nil {
+			return nil, fmt.Errorf("jwt: accounts[%d]: value: %w", i, err)
+		}
+		account, err := entry.Get(ctx, "account")
+		if err != nil {
+			return nil, fmt.Errorf("jwt: accounts[%d]: account: %w", i, err)
+		}
+		if value == "" || account == "" {
+			return nil, fmt.Errorf("jwt: accounts[%d]: value and account are both required", i)
+		}
+		rules = append(rules, accountRule{value: value, account: account})
+	}
+	if len(rules) == 0 {
+		return nil, errors.New("jwt: accounts is empty")
+	}
+	return rules, nil
 }
 
 // newJWKSFromConfig reads "jwks_url" (required) and "jwks_refresh" (optional, a
@@ -188,11 +223,46 @@ func (a *Auth) Authenticate(_ context.Context, token string) (access.Principal, 
 	if err := registered.Validate(expected); err != nil {
 		return access.Principal{}, autherr.ErrUnauthenticated
 	}
-	account, err := stringClaim(raw, a.accountClaim)
+	account, err := a.account(raw)
 	if err != nil {
 		return access.Principal{}, autherr.ErrUnauthenticated
 	}
 	return access.Principal{Account: account}, nil
+}
+
+// account resolves the claim: it names the account itself, or carries values the rules
+// map. Matching nothing authenticates nobody.
+func (a *Auth) account(raw map[string]json.RawMessage) (string, error) {
+	if len(a.accounts) == 0 {
+		return stringClaim(raw, a.accountClaim)
+	}
+	held, err := claimValues(raw, a.accountClaim)
+	if err != nil {
+		return "", err
+	}
+	for _, rule := range a.accounts {
+		if slices.Contains(held, rule.value) {
+			return rule.account, nil
+		}
+	}
+	return "", fmt.Errorf("claim %q carries no configured account", a.accountClaim)
+}
+
+// claimValues reads name as a string or as a list of them.
+func claimValues(raw map[string]json.RawMessage, name string) ([]string, error) {
+	msg, ok := raw[name]
+	if !ok {
+		return nil, fmt.Errorf("claim %q is absent", name)
+	}
+	var one string
+	if err := json.Unmarshal(msg, &one); err == nil {
+		return []string{one}, nil
+	}
+	var list []string
+	if err := json.Unmarshal(msg, &list); err != nil {
+		return nil, fmt.Errorf("claim %q is neither a string nor a list of them: %w", name, err)
+	}
+	return list, nil
 }
 
 // stringClaim reads name from the token's raw payload as a string — the account claim

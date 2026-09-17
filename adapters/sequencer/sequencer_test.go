@@ -178,44 +178,25 @@ func TestBookmarkReopensAPrunedList(t *testing.T) {
 	require.Equal(t, before.Head().String(), after.Head().String())
 }
 
-// TestContributorIdIsStableAcrossBuilds: one key yields one contributor id, so a
-// restart reopens an archive as the same identity instead of minting a new one.
-func TestContributorIdIsStableAcrossBuilds(t *testing.T) {
-	ctx := context.Background()
-	cfg := signerConfig(t)
-	sequencerCfg := scope.Literal(map[string]string{"type": "dev", "seed": "a-list"})
-
-	build := func() ranke.Id {
-		sig, err := signer.New(ctx, cfg)
-		require.NoError(t, err)
-		seq, err := sequencer.New(ctx, sequencerCfg, ranke.NewMemoryUniverse(), sig, nil)
-		require.NoError(t, err)
-		return seq.GetContributor().ID()
-	}
-
-	require.Equal(t, build(), build())
-}
-
-// TestContributorAlwaysPinsToEpoch: the sequencer's own identity is minted once at
-// boot, before any --dev caller can possibly steer the clock — the HTTP server isn't
-// listening yet. It must precede whatever the earliest merge it signs turns out to be,
-// so it stays epoch-pinned whether or not a clock was supplied, past-dated fixtures
-// (a --dev story set in 2024, say) included; a value that tracked the clock instead
-// would put this identity's created_at *after* the very first branch table it signs,
-// which V-MONO forbids.
-func TestContributorAlwaysPinsToEpoch(t *testing.T) {
+// TestContributorTakesTheClockItWasBuiltWith: the sequencer's own identity is minted at
+// boot from the same clock its merges take, so it carries the time it was added rather
+// than a constant, and it precedes every branch table it will ever sign (`V-MONO`) —
+// the clock having advanced no further than boot when the identity is built.
+func TestContributorTakesTheClockItWasBuiltWith(t *testing.T) {
 	ctx := context.Background()
 	cfg := scope.Literal(map[string]string{"type": "dev", "seed": "a-list"})
 
+	before := time.Now().UTC()
 	seq, err := sequencer.New(ctx, cfg, ranke.NewMemoryUniverse(), newSigner(t), nil)
 	require.NoError(t, err)
-	require.True(t, seq.GetContributor().Node().CreatedAt().Equal(time.Unix(0, 0).UTC()),
-		"nil now: want the identity pinned to the epoch")
+	at := seq.GetContributor().Node().CreatedAt().UTC()
+	require.False(t, at.Before(before), "nil now: want the identity dated by the wall clock")
+	require.False(t, at.After(time.Now().UTC()), "nil now: want the identity dated by the wall clock")
 
-	past := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+	story := time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)
 	seq, err = sequencer.New(ctx, cfg, ranke.NewMemoryUniverse(), newSigner(t),
-		func() time.Time { return past })
+		func() time.Time { return story })
 	require.NoError(t, err)
-	require.True(t, seq.GetContributor().Node().CreatedAt().Equal(time.Unix(0, 0).UTC()),
-		"a supplied now, even a --dev story's own past date: want the identity still pinned to the epoch")
+	require.True(t, seq.GetContributor().Node().CreatedAt().Equal(story),
+		"a supplied clock: want the identity dated in the story that clock tells")
 }

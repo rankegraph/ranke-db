@@ -7,14 +7,16 @@ import (
 	"github.com/rankegraph/ranke-db/adapters/sequencer"
 )
 
-// TestSteerableClockReadsEpochUntilAdvanced pins the default: a fresh clock reads the
-// epoch, not real time — bt₀ mints from this clock at server boot, before any --dev
-// client can possibly have steered it, and every later branch table chains back to it
-// (R-C6MERGE), so it must precede whatever a fixture's own past-dated story asks for.
-func TestSteerableClockReadsEpochUntilAdvanced(t *testing.T) {
+// TestSteerableClockReadsRealTimeUntilAdvanced pins the default: an unsteered clock
+// reads now, which is the time a claim minted from it was actually added. bt₀ mints
+// here at server boot and every later branch table chains forward from it (R-C6MERGE),
+// so a story steers to its own dates rather than the clock starting at one.
+func TestSteerableClockReadsRealTimeUntilAdvanced(t *testing.T) {
+	before := time.Now().UTC()
 	c := sequencer.NewSteerableClock()
-	if got := c.Now(); !got.Equal(time.Unix(0, 0).UTC()) {
-		t.Errorf("Now() = %s, want the epoch", got)
+	got := c.Now()
+	if got.Before(before) || got.After(time.Now().UTC()) {
+		t.Errorf("Now() = %s, want an instant within this test's own run", got)
 	}
 }
 
@@ -26,7 +28,7 @@ func TestSteerableClockReadsEpochUntilAdvanced(t *testing.T) {
 func TestSteerableClockFirstAdvanceLandsInThePast(t *testing.T) {
 	c := sequencer.NewSteerableClock()
 
-	past := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC) // long before whenever this test runs
+	past := time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC) // long before whenever this test runs
 	if got := c.Advance(past); !got.Equal(past) {
 		t.Fatalf("first Advance(%s) = %s, want the requested instant exactly", past, got)
 	}
