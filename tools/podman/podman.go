@@ -4,10 +4,10 @@
 // limits:  a test helper; it skips without podman and waits for the port, not for readiness
 //
 // Package podman is the shared boilerplate for the real-counterpart adapter tests
-// (OpenBao for the vault and signer ports, and more to come). An adapter's only
-// meaningful test drives its real backend, spun up here via podman; Run publishes
-// the container on a free host port, returns that address plus a teardown, and
-// skips the test when podman is not installed so the offline gate stays green.
+// (OpenBao, and lowkey-vault for the Azure backends). An adapter's only meaningful
+// test drives its real backend, spun up here; Run publishes it on a free host
+// port, returns that address plus a teardown, and skips the test when podman is
+// missing so the offline gate stays green.
 package podman
 
 import (
@@ -22,16 +22,24 @@ import (
 // Spec describes a container to run for a test.
 type Spec struct {
 	Image string            // image reference, e.g. ghcr.io/openbao/openbao:latest
-	Port  int               // container port to publish
+	Port  int               // container port to publish and wait for
+	More  []int             // further container ports to publish, addressed through RunMore
 	Env   map[string]string // environment variables
 	Args  []string          // command + args after the image
 }
 
-// Run starts spec's container on a free host port and returns its host address
-// (127.0.0.1:PORT) plus a teardown that removes it. It skips the test when podman
-// is not installed, and waits until the published port accepts connections; the
-// caller performs any service-specific readiness (e.g. an unseal/health check).
+// Run starts spec's container and returns the address of spec.Port plus a
+// teardown. It waits until that port accepts connections; the caller performs any
+// service-specific readiness (e.g. an unseal/health check).
 func Run(t testing.TB, spec Spec) (addr string, teardown func()) {
+	t.Helper()
+	addr, _, teardown = RunMore(t, spec)
+	return addr, teardown
+}
+
+// RunMore is Run for a counterpart whose API and token endpoint listen separately:
+// it also returns spec.More's addresses, keyed by container port.
+func RunMore(t testing.TB, spec Spec) (addr string, more map[int]string, teardown func()) {
 	t.Helper()
 	if _, err := exec.LookPath("podman"); err != nil {
 		t.Skipf("podman not found; skipping %s test", spec.Image)
@@ -42,6 +50,12 @@ func Run(t testing.TB, spec Spec) (addr string, teardown func()) {
 	name := fmt.Sprintf("ranke-test-%d", port)
 
 	args := []string{"run", "--rm", "-d", "--name", name, "-p", addr + ":" + strconv.Itoa(spec.Port)}
+	more = make(map[int]string, len(spec.More))
+	for _, p := range spec.More {
+		a := fmt.Sprintf("127.0.0.1:%d", freePort(t))
+		more[p] = a
+		args = append(args, "-p", a+":"+strconv.Itoa(p))
+	}
 	for k, v := range spec.Env {
 		args = append(args, "-e", k+"="+v)
 	}
@@ -53,7 +67,7 @@ func Run(t testing.TB, spec Spec) (addr string, teardown func()) {
 	teardown = func() { _ = exec.Command("podman", "rm", "-f", name).Run() }
 
 	waitPort(t, addr, teardown)
-	return addr, teardown
+	return addr, more, teardown
 }
 
 func freePort(t testing.TB) int {

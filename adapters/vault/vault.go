@@ -28,7 +28,7 @@ type Vault interface {
 }
 
 // New builds the vault backend named by the section's "type": "openbao" (KV v2)
-// or "azure" (Azure Key Vault, scaffold). An empty or unknown type is an error.
+// or "azure" (Azure Key Vault secrets). An empty or unknown type is an error.
 func New(ctx context.Context, cfg scope.Section) (Vault, error) {
 	var t string
 	if cfg.HasValue("type") {

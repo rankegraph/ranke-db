@@ -6,6 +6,25 @@ What each release changed for someone depending on this repository.
 
 ### Added
 
+- The `vault` section's `azure` backend reads Azure Key Vault secrets. `url` is the Key
+  Vault URI; a `vault(REF)` reference names a secret in it, `REF` alone reading the current
+  version and `name/version` a pinned one. The identity is the ambient one — a managed
+  identity, the `AZURE_*` variables, a signed-in `az` — unless `tenant_id`, `client_id` and
+  `client_secret` name a service principal; `ca_cert` trusts a PEM certificate in place of
+  the system roots, for a private certificate authority or a local emulator. It replaces the
+  scaffold that accepted its configuration and refused every read.
+- A `signer` backend `azure`, an Azure Key Vault identity in either scheme `V-SIGN` names,
+  configured beside the `url` and credential fields the vault backend reads. `key` names a
+  Key Vault key and signing is a vault operation under `ES256`, the private half never
+  leaving Azure; `secret` names a secret holding an Ed25519 PKCS#8 PEM, which the server
+  fetches and signs with in process, for an identity that must be Ed25519. Either takes
+  `name` or `name/version`, and naming both is refused. The key version that answers the
+  first read is the version the run signs under, so a rotation reaches a server at its next
+  launch.
+- The signing identity reported by `health` and the launch log renders a P-256 key as
+  `p256:<base64 compressed point>`, beside the `ed25519:<base64 key>` it already rendered —
+  the framings `V-SIGN` gives each scheme. A key of neither scheme still reports its Go type.
+
 - The explorer draws a claim's provenance: **show claim provenance** in the selection pane opens
   the closure rooted at that claim in its own graph view, with the canvas, layouts, camera and
   lens every other view uses. One view per claim; asking again brings it forward. A provenance
@@ -25,11 +44,16 @@ What each release changed for someone depending on this repository.
 
 ### Changed
 
-- ranke-go moves to v0.33.1, where a verification failure travels as the cause of the
-  Sequencer's error. A refused contribution is answered with the claim and the rule alone —
-  `ranke.verify: claim bciq…: §4.1 height — … got 5, want 1` — where it carried the
-  Sequencer's own wrapper and a Go struct dump around them. A contribution of many claims
-  therefore names the one to correct.
+- ranke-go moves to v0.34.0, where `V-SIGN` names a second signing scheme: a claim may
+  be signed under ECDSA over P-256 (`ES256`, pubkey framed as the multicodec `p256-pub`)
+  beside Ed25519. Ed25519 claims keep their ids and every backend here signs as it did, so
+  nothing in a running deployment changes; what it opens is a signing identity held where no
+  Ed25519 key type is published — an Azure Key Vault key, a Managed HSM — which this repo
+  does not yet offer as a `signer` backend. The release also carries a verification failure as
+  the cause of the Sequencer's error, so a refused contribution is answered with the claim and
+  the rule alone — `ranke.verify: claim bciq…: §4.1 height — … got 5, want 1` — where it
+  carried the Sequencer's own wrapper and a Go struct dump around them. A contribution of many
+  claims therefore names the one to correct.
 - A `Scope` carries `branch`, the scope a query names to read it (`select.branch`, `R-QSCOPE`),
   beside the head whose closure it is. A branch and `$archive` are read within themselves; a
   claim's provenance within the branch it was reached through. Code building a `Scope` literal
@@ -37,6 +61,10 @@ What each release changed for someone depending on this repository.
 - Scope membership is keyed by head rather than by scope name, a head being what identifies a
   closure. A branch whose head has advanced now misses the cache rather than reusing the answer
   for the head it had.
+- The `release` fixture's people carry their name and nothing else: an `entity/person` claim
+  says "Ada Okonjo" where it said "Ada Okonjo — release manager". The role is stated in the
+  staff record introducing her, which is where a job held at a time belongs. The fixture is
+  deterministic, so its ids change with the text.
 
 ### Fixed
 

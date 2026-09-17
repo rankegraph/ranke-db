@@ -216,12 +216,15 @@ func (g *grower) release(ctx context.Context, branch string, releases int) (batc
 	return out, nil
 }
 
-// participants pairs each actor with the type of entity it is and the record introducing it.
-var participants = []struct{ who, entity, record, label string }{
-	{whoRelease, typePerson, typeStaffRecord, "Ada Okonjo — release manager"},
-	{whoSecurity, typePerson, typeStaffRecord, "Bruno Sallé — security expert"},
-	{whoTests, typePerson, typeStaffRecord, "Chen Wei — test executor"},
-	{whoCI, typeCIInstance, typeRunnerRecord, "ci-runner-07 — x86_64 build runner"},
+// participants pairs each actor with the type of entity it is, the record introducing it, who
+// it is, and the job it held then. Name and role are separate because they are separate
+// things: a person is a person, and what they were doing at the time is what a record says
+// about them — so the entity carries the name and the record carries the role.
+var participants = []struct{ who, entity, record, name, role string }{
+	{whoRelease, typePerson, typeStaffRecord, "Ada Okonjo", "release manager"},
+	{whoSecurity, typePerson, typeStaffRecord, "Bruno Sallé", "security expert"},
+	{whoTests, typePerson, typeStaffRecord, "Chen Wei", "test executor"},
+	{whoCI, typeCIInstance, typeRunnerRecord, "ci-runner-07", "x86_64 build runner"},
 }
 
 // actors builds the four participants: the introducing record, the entity, and the key the
@@ -235,7 +238,7 @@ func (g *grower) actors(ctx context.Context, branch string) (map[string]*actor, 
 		record, err := g.write(spec{
 			by: g.rootSigner(), branch: branch, typ: p.record,
 			fields:  map[string]string{"name": p.who},
-			content: []byte(recordText(p.label, p.who)),
+			content: []byte(recordText(p.name, p.role, p.who)),
 		})
 		if err != nil {
 			return nil, nil, err
@@ -243,7 +246,7 @@ func (g *grower) actors(ctx context.Context, branch string) (map[string]*actor, 
 		entity, err := g.write(spec{
 			by: g.rootSigner(), branch: branch, typ: p.entity,
 			fields:  map[string]string{"name": p.who},
-			content: []byte(p.label),
+			content: []byte(p.name),
 			cites:   asInputs(record),
 		})
 		if err != nil {
@@ -433,10 +436,12 @@ func logText(title string, paragraphs int) string {
 	return b.String()
 }
 
-// recordText is the record that introduces a participant to the archive.
-func recordText(label, who string) string {
-	return fmt.Sprintf("%s\n\nhandle: %s\nadded to the release process by the archive's root.\n",
-		label, who)
+// recordText is the record that introduces a participant to the archive. The role is stated
+// here and nowhere else: it is a job held when the record was written, which is a claim about
+// a person rather than part of who they are — the entity says only the name.
+func recordText(name, role, who string) string {
+	return fmt.Sprintf("%s\n\nrole: %s\nhandle: %s\nadded to the release process by the archive's root.\n",
+		name, role, who)
 }
 
 // snapshotText carries enough to recognise the commit; the hash comes from package and
