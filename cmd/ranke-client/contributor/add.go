@@ -48,7 +48,7 @@ func addCmd(inst *instance.Instance) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			pair, err := Load(keySpec, cmd.InOrStdin())
+			pair, err := Load(cmd.Context(), keySpec, cmd.InOrStdin())
 			if err != nil {
 				return err
 			}
@@ -63,7 +63,8 @@ func addCmd(inst *instance.Instance) *cobra.Command {
 		"the key to admit: the hex a listing prints, or a path to an Ed25519 public-key PEM")
 	c.Flags().StringVar(&keySpec, "signing-key", "",
 		"the contributor key the new claim is attributed to and signed under: a path, "+
-			"file:path, env:VAR, stdin, or prompt")
+			"file:path, env:VAR, stdin, prompt, or azure:https://VAULT/keys/NAME, which "+
+			"signs in the vault and holds no key here")
 	if err := c.MarkFlagRequired("pubkey"); err != nil {
 		panic(err) // the flag was just declared, so this cannot be a runtime condition
 	}

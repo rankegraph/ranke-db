@@ -4,6 +4,21 @@ What each release changed for someone depending on this repository.
 
 ## Unreleased
 
+## v1.30.0 — 2026-09-21
+
+### Added
+
+- `ranke-client --signing-key` takes `azure:https://VAULT/keys/NAME` beside the spellings
+  `keysource` gives it (a path, `file:`, `env:`, `stdin`, `prompt`). The named Key Vault key
+  signs every claim in the vault, so the machine running the command holds no key material
+  and a founding identity can exist with none outside the vault. Credentials are the ambient
+  identity's, as they are for the `azure` signer backend. `branch create`, `contributor add`
+  and `contributor list` all take it.
+- `signer.CryptoSigner(ctx, s)` presents the Signer port as a `crypto.Signer`, which is what
+  ranke-go signs a claim through. The sequencer held this adaptation privately; it is now
+  the port's, and founding an identity on a backend — a key that never leaves its vault
+  included — is part of the contract every backend is held to.
+
 ## v1.29.0 — 2026-09-21
 
 ### Added

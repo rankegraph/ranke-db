@@ -48,7 +48,7 @@ func listCmd(inst *instance.Instance) *cobra.Command {
 			}
 			var only []byte
 			if keySpec != "" {
-				pair, err := Load(keySpec, cmd.InOrStdin())
+				pair, err := Load(cmd.Context(), keySpec, cmd.InOrStdin())
 				if err != nil {
 					return err
 				}
@@ -62,7 +62,7 @@ func listCmd(inst *instance.Instance) *cobra.Command {
 		"read one branch rather than the whole archive")
 	c.Flags().StringVar(&keySpec, "signing-key", "",
 		"list only the contributors carrying this key's pubkey: a path, file:path, env:VAR, "+
-			"stdin, or prompt")
+			"stdin, prompt, or azure:https://VAULT/keys/NAME")
 	return c
 }
 

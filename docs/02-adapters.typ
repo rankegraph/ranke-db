@@ -217,6 +217,28 @@ already exists is reported as such and left alone, so provisioning may call it
 ahead of every launch. Only the public half of the founding key is ever given
 to the server: whatever contributes under that identity keeps the rest.
 
+That rest need not be a file. `ranke-client` takes its `--signing-key` as a
+path, `file:`, `env:`, `stdin` or `prompt`, and also as
+`azure:https://VAULT/keys/NAME`, a key in Azure Key Vault: the vault signs
+every claim and the private half never reaches the machine running the
+command, which is what lets a founding identity exist with no key material
+anywhere outside the vault. Credentials are the ambient identity's, as they are
+for the `azure` signer backend (@sec:signer), so the argument names a
+location and carries no secret.
+
+#example[
+#listing[
+```sh
+az keyvault key create --vault-name ranke --name founder \
+  --kty EC --curve P-256 --ops sign verify
+az keyvault key download --vault-name ranke --name founder --file founder.pub.pem
+ranke-db found config.json founder.pub.pem
+ranke-client branch create main \
+  --signing-key azure:https://ranke.vault.azure.net/keys/founder
+```
+]
+]
+
 == `signer` — the identity merges are attested with <sec:signer>
 
 This is the server's own key, and it signs merges. It never signs a
