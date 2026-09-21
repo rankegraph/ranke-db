@@ -4,6 +4,8 @@ What each release changed for someone depending on this repository.
 
 ## Unreleased
 
+## v1.29.0 — 2026-09-21
+
 ### Added
 
 - A `storage` leaf `azure`, Azure Blob Storage as the object store beside `s3`: `container`
