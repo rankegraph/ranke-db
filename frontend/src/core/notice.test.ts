@@ -66,7 +66,7 @@ test('a scope with nothing in it says so rather than drawing blank', async () =>
   reset();
   useExplorer.getState().addTab(defaultView('v1', 'v1'));
 
-  await selectScope({ name: 'no-such-branch', head: 'no-such-head' });
+  await selectScope({ name: 'no-such-branch', head: 'no-such-head', branch: 'no-such-branch' });
   const notice = useExplorer.getState().notice;
   assert.ok(notice, 'an empty scope said nothing');
   assert.match(notice.text, /no claims/i);
@@ -94,7 +94,7 @@ test('selecting a scope loads it without a second action', async () => {
   await selectScope(branch);
 
   assert.ok(graph().order > 0, 'selecting a scope drew nothing — a read was not issued');
-  const drawn = [...(membersOf(branch.name) ?? [])].filter((id) => graph().hasNode(id));
+  const drawn = [...(membersOf(branch.head) ?? [])].filter((id) => graph().hasNode(id));
   assert.ok(drawn.length > 0, 'none of the scope’s claims reached the union');
   assert.equal(useExplorer.getState().notice, null, `notice = ${JSON.stringify(useExplorer.getState().notice)}`);
 });

@@ -4,6 +4,127 @@ What each release changed for someone depending on this repository.
 
 ## Unreleased
 
+## v1.28.0 — 2026-09-21
+
+### Added
+
+- `client.ContributorFor(ctx, scope, pubkey, at)` — the registration a key signs under at an
+  instant: of the claims carrying that key, the first in arrival order whose window admits it
+  (`R-C4KEY`). It is the read an application makes before signing anything, which each caller
+  composed from `ContributorsFor`, `Expiries` and `ContributorWindows` until now.
+  `ErrNoLiveContributor` answers a key registered nowhere, and one whose registrations have
+  all lapsed, the message saying which — either way the caller registers the key again. Those
+  three reads stay exported for the choices this does not make: the latest registration, the
+  longest-lived, the one on a particular branch.
+
+- A `jwt` authenticator may map the values a claim carries onto accounts: `accounts`, an
+  ordered array of `{"value": …, "account": …}`, read with `account_claim` naming the claim
+  that carries them. It is how a directory decides who holds an account — an OpenID Connect
+  provider that issues roles (Microsoft Entra app roles, a group claim) states the role, and
+  this maps it to the service account the endpoint admits, so granting a person access is an
+  assignment with the provider rather than an edit here. The claim may hold one value or a
+  list; a subject holding several acts as the account configured first, and one holding none
+  of them is refused. Without `accounts` the claim names the account directly, as before.
+
+- The `vault` section's `azure` backend reads Azure Key Vault secrets. `url` is the Key
+  Vault URI; a `vault(REF)` reference names a secret in it, `REF` alone reading the current
+  version and `name/version` a pinned one. The identity is the ambient one — a managed
+  identity, the `AZURE_*` variables, a signed-in `az` — unless `tenant_id`, `client_id` and
+  `client_secret` name a service principal; `ca_cert` trusts a PEM certificate in place of
+  the system roots, for a private certificate authority or a local emulator. It replaces the
+  scaffold that accepted its configuration and refused every read.
+- A `signer` backend `azure`, an Azure Key Vault identity in either scheme `V-SIGN` names,
+  configured beside the `url` and credential fields the vault backend reads. `key` names a
+  Key Vault key and signing is a vault operation under `ES256`, the private half never
+  leaving Azure; `secret` names a secret holding an Ed25519 PKCS#8 PEM, which the server
+  fetches and signs with in process, for an identity that must be Ed25519. Either takes
+  `name` or `name/version`, and naming both is refused. The key version that answers the
+  first read is the version the run signs under, so a rotation reaches a server at its next
+  launch.
+- The signing identity reported by `health` and the launch log renders a P-256 key as
+  `p256:<base64 compressed point>`, beside the `ed25519:<base64 key>` it already rendered —
+  the framings `V-SIGN` gives each scheme. A key of neither scheme still reports its Go type.
+
+- The explorer draws a claim's provenance: **show claim provenance** in the selection pane opens
+  the closure rooted at that claim in its own graph view, with the canvas, layouts, camera and
+  lens every other view uses. One view per claim; asking again brings it forward. A provenance
+  scope is read within the branch the claim was reached through, through the identities-only
+  query a branch scope already sends — no new route and no server change.
+  It draws on the timeline, the axis every other view draws on, so the ruler, the time cursor
+  and both stretches mean in it what they mean everywhere else — the historical picture,
+  filtered to one closure. What the closure gets of its own is placement and captions: within
+  each band its claims take lanes in time order, each in the lowest lane its neighbour in time
+  leaves free rather than the hash lane every other claim takes, so a closure reads without
+  overlap; and every claim in a closure of up to 400 carries its caption, including while
+  another claim is selected. A caption there takes a second line — the first line of what the
+  claim says, up to 60 characters — so a chain reads as text rather than as dots to click
+  through, where a type alone says only what kind of thing each one is. Claims read after the
+  view is drawn are placed without moving the ones already on screen, unless the read moved the
+  time axis, which moves every claim with it.
+
+### Changed
+
+- The REST contract takes ranke-graph's current RQL schema, so a query may anchor at a set of
+  claims — `select.claim` accepts an array of ids beside a single one, each named once and in
+  no order (`R-QANCHOR`) — which is the read that resolves the heights of a new claim's
+  references (`V-HEIGHT`) in one call. `select.path` now distinguishes empty from absent:
+  `[]` takes no step and returns the frontier itself, where omitting it returns that
+  frontier's full outward closure (`R-QSTEPS`). A client sending `"path": []` and meaning
+  "everything" now gets the anchors alone. The vendored `openapi/rql.schema.json` and every
+  generated artifact move with it, the explorer's committed client included.
+- ranke-go moves to v0.35.0, which refuses a claim dated before 2026-05-03 — the day the
+  design it conforms to was founded, so no earlier timestamp states a time a claim was
+  added. Nothing here dates a claim by a constant any more: the server's signing identity
+  carries the instant it was built, and under `--dev` the steerable clock reads real time
+  until a story steers it, where both stood at the Unix epoch. A restart therefore registers
+  a fresh contributor claim carrying the same key, the archive holding one per launch. A key
+  reaching the graph under several contributor claims is ordinary — it is how a claim whose
+  validity window was set wrong is corrected, by registering the key again beside it — and a
+  `pubkey` is content those claims carry rather than a name that identifies them. Date a claim about something older
+  with `dated` (`V-DATED`), which is the field for when a subject stems from.
+- A contribution referencing a claim neither the archive holds nor the stream carries is
+  answered `forbidden` where it was answered `invalid` (ranke-go v0.35.0). The refusal says
+  the reference is out of reach and nothing about whether it exists.
+- ranke-go moves to v0.34.0, where `V-SIGN` names a second signing scheme: a claim may
+  be signed under ECDSA over P-256 (`ES256`, pubkey framed as the multicodec `p256-pub`)
+  beside Ed25519. Ed25519 claims keep their ids and every backend here signs as it did, so
+  nothing in a running deployment changes; what it opens is a signing identity held where no
+  Ed25519 key type is published — an Azure Key Vault key, a Managed HSM — which this repo
+  does not yet offer as a `signer` backend. The release also carries a verification failure as
+  the cause of the Sequencer's error, so a refused contribution is answered with the claim and
+  the rule alone — `ranke.verify: claim bciq…: §4.1 height — … got 5, want 1` — where it
+  carried the Sequencer's own wrapper and a Go struct dump around them. A contribution of many
+  claims therefore names the one to correct.
+- A `Scope` carries `branch`, the scope a query names to read it (`select.branch`, `R-QSCOPE`),
+  beside the head whose closure it is. A branch and `$archive` are read within themselves; a
+  claim's provenance within the branch it was reached through. Code building a `Scope` literal
+  must supply it.
+- Scope membership is keyed by head rather than by scope name, a head being what identifies a
+  closure. A branch whose head has advanced now misses the cache rather than reusing the answer
+  for the head it had.
+- The `release` fixture's people carry their name and nothing else: an `entity/person` claim
+  says "Ada Okonjo" where it said "Ada Okonjo — release manager". The role is stated in the
+  staff record introducing her, which is where a job held at a time belongs. The fixture is
+  deterministic, so its ids change with the text.
+
+### Fixed
+
+- A reference whose target had not been read was discarded, so the claim that stated it drew as
+  an initial claim — a claim with no references, where the archive says otherwise. Such
+  references are now held and drawn when a later read supplies the target, and the number still
+  waiting is reported rather than counted and thrown away.
+- A read stopped at its result cap was recorded as a scope's whole membership, confining the
+  view to a boundary the archive does not have. A capped read now records nothing, and an
+  unasked scope already admits everything.
+- The selection pane called a claim with no references drawn an initial claim, whether or not
+  its references had been read. It now distinguishes the two by height, which an initial claim
+  carries as 0, and says "1 of 3 read" where a claim's reference list is only partly loaded.
+- `make verify` failed `check-tools` on a fresh checkout with "TYPST_VERSION is not fetched
+  yet", even with network reachable: `verify`'s `generate` prerequisite ran `check-tools`
+  before `docs-pdf`'s `docs-current` had fetched `docs/papers/TYPST_VERSION`, the file
+  `check-tools` reads the pin from. `check-tools` now depends on `docs-current` directly, so
+  the pin is on disk before it is read.
+
 ## v1.27.2 — 2026-09-10
 
 ### Changed

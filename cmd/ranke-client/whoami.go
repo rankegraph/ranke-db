@@ -1,4 +1,4 @@
-// package: main / cmd
+// package: ranke-client / cmd
 // type:    entrypoint
 // job:     `ranke-client whoami` — report what this credential may do
 // limits:  CLI wiring; the answer is the server's (-> GET /system/whoami)

@@ -156,7 +156,7 @@ pull-rql-schema: ## Pull rql.schema.json from the ranke-graph spec into openapi/
 
 # --- Code/doc generation from the OpenAPI spec -----------------------------
 
-check-tools: ## Verify the toolchain is installed at the versions this repo pins (reports all missing at once)
+check-tools: docs-current ## Verify the toolchain is installed at the versions this repo pins (reports all missing at once)
 	@missing=0; \
 	check() { command -v "$$1" >/dev/null 2>&1 || { printf "  missing: %-6s → %s\n" "$$1" "$$2"; missing=1; }; }; \
 	check go  "https://go.dev/dl/"; \

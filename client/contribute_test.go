@@ -220,4 +220,10 @@ func TestAClaimBreakingARuleIsRefusedAsInvalid(t *testing.T) {
 		t.Errorf("the refusal reads %q, and a caller correcting the claim needs the rule "+
 			"verification named", refused.Message)
 	}
+	// The claim, so a caller with a batch in flight knows which one to correct.
+	if !bytes.Contains([]byte(refused.Message), []byte(wrong.ID().String())) {
+		t.Errorf("the refusal reads %q, and a contribution of many claims needs the one "+
+			"that failed named: %s", refused.Message, wrong.ID())
+	}
+	t.Logf("refusal: %s", refused.Message)
 }

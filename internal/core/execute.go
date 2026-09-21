@@ -385,6 +385,12 @@ func mapVerifyError(err error) error {
 	if Categorize(mapped) != CatInternal {
 		return mapped
 	}
+	// The failure travels as the cause, so the refusal carries the claim and the rule it
+	// broke rather than the wrapper the Sequencer built around them.
+	var failed ranke.Failure
+	if errors.As(err, &failed) {
+		return fmt.Errorf("%w: %v", ErrInvalidRequest, failed)
+	}
 	return fmt.Errorf("%w: %v", ErrInvalidRequest, err)
 }
 

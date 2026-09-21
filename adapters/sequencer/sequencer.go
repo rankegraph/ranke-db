@@ -46,12 +46,12 @@ func New(ctx context.Context, cfg scope.Section, storage ranke.Universe, sig sig
 	if err != nil {
 		return nil, err
 	}
-	self, err := contributor(ctx, storage, sig)
-	if err != nil {
-		return nil, err
-	}
 	if now == nil {
 		now = func() time.Time { return time.Now().UTC() }
+	}
+	self, err := contributor(ctx, storage, sig, now())
+	if err != nil {
+		return nil, err
 	}
 	clock := clockFunc(now)
 
@@ -98,10 +98,10 @@ func bookmarkList(ctx context.Context, cfg scope.Section) (ranke.BookmarkLocator
 	}
 }
 
-// contributor builds the identity merges are signed as. created_at is pinned to the
-// epoch: this identity is built at boot, before a --dev caller can steer the clock, and
-// it must precede the earliest merge it will ever sign (`V-MONO`).
-func contributor(ctx context.Context, u ranke.Universe, sig signer.Signer) (ranke.Contributor, error) {
+// contributor builds the identity merges are signed as, dated when it is made: at boot,
+// off the same clock the merges take, so it precedes every merge it will ever sign
+// (`V-MONO`) and states a time a claim was actually added rather than a constant.
+func contributor(ctx context.Context, u ranke.Universe, sig signer.Signer, at time.Time) (ranke.Contributor, error) {
 	pub, err := sig.Public(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("sequencer: signer public key: %w", err)
@@ -114,7 +114,7 @@ func contributor(ctx context.Context, u ranke.Universe, sig signer.Signer) (rank
 	claim, err := ranke.NewClaim(ranke.NodeContributor, nil).
 		WithInlineContent(encoded).
 		WithEncoding(ranke.EncodingOctetStream).
-		WithCreatedAt(time.Unix(0, 0).UTC()).
+		WithCreatedAt(at).
 		Sign(key)
 	if err != nil {
 		return nil, fmt.Errorf("sequencer: sign contributor claim: %w", err)

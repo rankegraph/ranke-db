@@ -1,4 +1,4 @@
-// package: main / cmd
+// package: ranke-db / cmd
 // type:    entrypoint
 // job:     `ranke-db verify` — check a config to a chosen depth, without serving
 // limits:  CLI wiring; the checks themselves are config's (-> config)

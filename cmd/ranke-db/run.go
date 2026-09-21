@@ -1,4 +1,4 @@
-// package: main / cmd
+// package: ranke-db / cmd
 // type:    entrypoint
 // job:     `ranke-db run` — assemble the stack from a config and serve every endpoint it mounts
 // limits:  CLI wiring and the serve loop; the assembly is config's (-> config)

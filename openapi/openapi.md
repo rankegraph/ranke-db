@@ -2220,8 +2220,25 @@ A generator in four independent parts: branch is the scope, head the closure rea
 |---|---|---|---|---|
 |branch|string|true|none|The mandatory scope, and every scope names a graph: a branch name confines to that branch, $archive to the whole Ranke-Archive, $universe applies no confinement and is privileged. An empty value is refused (R-QSCOPE).|
 |head|[Id](#schemaid)|false|none|The closure read: the query sees the intersection of the scope's graph and closure(head), so a head narrows a query. Required under $universe, which confines nothing and so offers no head to fall back on, and may name any claim the Universe holds there; optional under every other scope, where the scope's own head serves (R-QHEAD).|
-|claim|[Id](#schemaid)|false|none|Anchors the frontier at the single claim it names, which must lie inside the closure. Absent, the frontier is every claim in the closure and the path is unanchored (R-QANCHOR).|
-|path|[[PathStep](#schemapathstep)]|false|none|The traversal: a sequence of steps over frontiers, each frontier a set of claims. Each step's yield is the frontier the next starts from, and the no-repeat rule holds within a step and resets at each boundary, so membership is all a frontier carries (R-QFRONTIER). Absent, the generator returns the full outward closure of the frontier (R-QSTEPS).|
+|claim|any|false|none|Anchors the frontier at the claims it names, one id or a set of them, each of which must lie inside the closure. A set names its members in no order and holds each once. Absent, the frontier is every claim in the closure and the path is unanchored (R-QANCHOR). A set anchor with an empty path resolves the height of the claims a new claim references (V-HEIGHT) in one read.|
+
+oneOf
+
+|Name|Type|Required|Restrictions|Description|
+|---|---|---|---|---|
+|» *anonymous*|[Id](#schemaid)|false|none|A claim id: id(v) = Sign(H(S(v))) for a node, id(e) = H(S(e)) for an edge, carried as multibase base32 of the self-describing payload. The pattern fixes the multibase framing; whether the payload's multihash or multikey framing parses is the implementation's check.|
+
+xor
+
+|Name|Type|Required|Restrictions|Description|
+|---|---|---|---|---|
+|» *anonymous*|[[Id](#schemaid)]|false|none|[A claim id: id(v) = Sign(H(S(v))) for a node, id(e) = H(S(e)) for an edge, carried as multibase base32 of the self-describing payload. The pattern fixes the multibase framing; whether the payload's multihash or multikey framing parses is the implementation's check.]|
+
+continued
+
+|Name|Type|Required|Restrictions|Description|
+|---|---|---|---|---|
+|path|[[PathStep](#schemapathstep)]|false|none|The traversal: a sequence of steps over frontiers, each frontier a set of claims. Each step's yield is the frontier the next starts from, and the no-repeat rule holds within a step and resets at each boundary, so membership is all a frontier carries (R-QFRONTIER). Empty, the generator takes no step and returns the frontier itself; absent, it returns the frontier's full outward closure (R-QSTEPS).|
 
 <h2 id="tocS_Where">Where</h2>
 <!-- backwards compatibility -->
@@ -2286,7 +2303,7 @@ null
 
 ```
 
-A value a comparison tests against. Where it tests a time it MUST be a V-TIME timestamp or an EDTF Level 1 value, and anything else is rejected rather than coerced (R-QTIMEOP); otherwise how two values compare is the engine's.
+A value a comparison tests against. On a field V-TIME or V-DATED governs it MUST take that field's own form — a V-TIME timestamp on a V-TIME field, an EDTF Level 1 value on a V-DATED field — and anything else, a glob included, is rejected rather than coerced (R-QTIMEOP); an interval is a pair of bounds. The form binds the value as encoded here, so a binding may take its own language's temporal type provided it renders it into that form. Otherwise how two values compare is the engine's.
 
 ### Properties
 
@@ -2312,12 +2329,12 @@ One operator applied to one field. eq, ne, lt, le, gt and ge take a value, in a 
 
 |Name|Type|Required|Restrictions|Description|
 |---|---|---|---|---|
-|eq|[Value](#schemavalue)|false|none|A value a comparison tests against. Where it tests a time it MUST be a V-TIME timestamp or an EDTF Level 1 value, and anything else is rejected rather than coerced (R-QTIMEOP); otherwise how two values compare is the engine's.|
-|ne|[Value](#schemavalue)|false|none|A value a comparison tests against. Where it tests a time it MUST be a V-TIME timestamp or an EDTF Level 1 value, and anything else is rejected rather than coerced (R-QTIMEOP); otherwise how two values compare is the engine's.|
-|lt|[Value](#schemavalue)|false|none|A value a comparison tests against. Where it tests a time it MUST be a V-TIME timestamp or an EDTF Level 1 value, and anything else is rejected rather than coerced (R-QTIMEOP); otherwise how two values compare is the engine's.|
-|le|[Value](#schemavalue)|false|none|A value a comparison tests against. Where it tests a time it MUST be a V-TIME timestamp or an EDTF Level 1 value, and anything else is rejected rather than coerced (R-QTIMEOP); otherwise how two values compare is the engine's.|
-|gt|[Value](#schemavalue)|false|none|A value a comparison tests against. Where it tests a time it MUST be a V-TIME timestamp or an EDTF Level 1 value, and anything else is rejected rather than coerced (R-QTIMEOP); otherwise how two values compare is the engine's.|
-|ge|[Value](#schemavalue)|false|none|A value a comparison tests against. Where it tests a time it MUST be a V-TIME timestamp or an EDTF Level 1 value, and anything else is rejected rather than coerced (R-QTIMEOP); otherwise how two values compare is the engine's.|
+|eq|[Value](#schemavalue)|false|none|A value a comparison tests against. On a field V-TIME or V-DATED governs it MUST take that field's own form — a V-TIME timestamp on a V-TIME field, an EDTF Level 1 value on a V-DATED field — and anything else, a glob included, is rejected rather than coerced (R-QTIMEOP); an interval is a pair of bounds. The form binds the value as encoded here, so a binding may take its own language's temporal type provided it renders it into that form. Otherwise how two values compare is the engine's.|
+|ne|[Value](#schemavalue)|false|none|A value a comparison tests against. On a field V-TIME or V-DATED governs it MUST take that field's own form — a V-TIME timestamp on a V-TIME field, an EDTF Level 1 value on a V-DATED field — and anything else, a glob included, is rejected rather than coerced (R-QTIMEOP); an interval is a pair of bounds. The form binds the value as encoded here, so a binding may take its own language's temporal type provided it renders it into that form. Otherwise how two values compare is the engine's.|
+|lt|[Value](#schemavalue)|false|none|A value a comparison tests against. On a field V-TIME or V-DATED governs it MUST take that field's own form — a V-TIME timestamp on a V-TIME field, an EDTF Level 1 value on a V-DATED field — and anything else, a glob included, is rejected rather than coerced (R-QTIMEOP); an interval is a pair of bounds. The form binds the value as encoded here, so a binding may take its own language's temporal type provided it renders it into that form. Otherwise how two values compare is the engine's.|
+|le|[Value](#schemavalue)|false|none|A value a comparison tests against. On a field V-TIME or V-DATED governs it MUST take that field's own form — a V-TIME timestamp on a V-TIME field, an EDTF Level 1 value on a V-DATED field — and anything else, a glob included, is rejected rather than coerced (R-QTIMEOP); an interval is a pair of bounds. The form binds the value as encoded here, so a binding may take its own language's temporal type provided it renders it into that form. Otherwise how two values compare is the engine's.|
+|gt|[Value](#schemavalue)|false|none|A value a comparison tests against. On a field V-TIME or V-DATED governs it MUST take that field's own form — a V-TIME timestamp on a V-TIME field, an EDTF Level 1 value on a V-DATED field — and anything else, a glob included, is rejected rather than coerced (R-QTIMEOP); an interval is a pair of bounds. The form binds the value as encoded here, so a binding may take its own language's temporal type provided it renders it into that form. Otherwise how two values compare is the engine's.|
+|ge|[Value](#schemavalue)|false|none|A value a comparison tests against. On a field V-TIME or V-DATED governs it MUST take that field's own form — a V-TIME timestamp on a V-TIME field, an EDTF Level 1 value on a V-DATED field — and anything else, a glob included, is rejected rather than coerced (R-QTIMEOP); an interval is a pair of bounds. The form binds the value as encoded here, so a binding may take its own language's temporal type provided it renders it into that form. Otherwise how two values compare is the engine's.|
 |in|[[Value](#schemavalue)]|false|none|Set membership.|
 |glob|string|false|none|Shell-style wildcard.|
 

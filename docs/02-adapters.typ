@@ -224,6 +224,22 @@ of whoever made them.
   path, `"transit"` by default; `key` names the Transit key.
 ]
 
+#item("azure")[
+  An Azure Key Vault identity, in either scheme `V-SIGN` names. `key` names a
+  Key Vault key: signing is a vault operation under `ES256`, so the private half
+  never leaves Azure. `secret` names a secret holding an Ed25519 private key as
+  PKCS\#8 PEM, fetched and signed with in the server process. Either takes
+  `name`, or `name/version` to pin a version; name one of the two. The vault URI
+  and the credential come from the fields the `azure` vault backend reads
+  (@sec:vault), so one section configures both ports.
+]
+
+#note[The key version that answers the first read is the version the whole run
+signs under, and an Ed25519 key is fetched once and held, so a rotation reaches
+a server at its next launch. Choose `secret` where the identity must be Ed25519,
+which Key Vault publishes no key type for; `key` is the one that keeps the
+private half in the vault.]
+
 #warning[Changing this key changes the identity every later merge is attested
 under. Pick one for a deployment and keep it.]
 
@@ -241,9 +257,13 @@ is the way to.
 ]
 
 #item("azure")[
-  `url`, an Azure Key Vault URI. The backend accepts its configuration and
-  refuses every read — secret resolution is not wired yet, so a deployment
-  cannot rely on it.
+  `url`, the Key Vault URI, required. A `vault(REF)` reference names a secret
+  in that vault: `REF` alone reads its current version, `name/version` the
+  version it names. The identity is the ambient one — a managed identity, the
+  `AZURE_*` variables, a signed-in `az` — unless the section names a service
+  principal with `tenant_id`, `client_id` and `client_secret` together.
+  `ca_cert`, a PEM certificate, is trusted in place of the system roots, which
+  is how a private certificate authority or a local emulator is reached.
 ]
 
 #example[
@@ -252,6 +272,16 @@ is the way to.
 "vault":  {"type": "openbao", "address": "https://bao.internal:8200",
            "token": "env(BAO_TOKEN)", "mount": "secret"},
 "signer": {"type": "inmemory", "key": "vault(rankedb/signing-key)"}
+```
+]
+]
+
+#example[
+#listing[
+```json
+"vault":  {"type": "azure", "url": "https://ranke.vault.azure.net/"},
+"signer": {"type": "azure", "url": "https://ranke.vault.azure.net/",
+           "key": "ranke-db-signing"}
 ```
 ]
 ]

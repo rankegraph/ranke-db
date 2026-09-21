@@ -107,13 +107,13 @@ test('the branch reads go out on the contract routes, archive head included', as
     asked.push(new URL(url).pathname);
     return url.endsWith('/archive/info')
       ? { body: { head: 'archive-head', height: 2, updatedAt: '2024-01-01T00:00:00Z', branches: 1 } }
-      : { body: { branches: [{ name: 'main', head: 'main-head' }] } };
+      : { body: { branches: [{ name: 'main', head: 'main-head', branch: 'main' }] } };
   });
   try {
     const scopes = await new RestSource(restConnection, '').branches();
     assert.deepEqual(scopes, [
-      { name: ARCHIVE_SCOPE, head: 'archive-head' },
-      { name: 'main', head: 'main-head' },
+      { name: ARCHIVE_SCOPE, head: 'archive-head', branch: ARCHIVE_SCOPE },
+      { name: 'main', head: 'main-head', branch: 'main' },
     ]);
   } finally {
     restore();
@@ -148,11 +148,11 @@ test('no backend offers a $universe scope', async () => {
 
   // Even asked to, the REST backend drops an entry with no head.
   const restore = stubFetch(() => ({
-    body: { branches: [{ name: 'main', head: 'h1' }, { name: '$universe' }] },
+    body: { branches: [{ name: 'main', head: 'h1', branch: 'main' }, { name: '$universe' }] },
   }));
   try {
     const fromRest = await new RestSource(restConnection, '').branches();
-    assert.deepEqual(fromRest, [{ name: 'main', head: 'h1' }]);
+    assert.deepEqual(fromRest, [{ name: 'main', head: 'h1', branch: 'main' }]);
   } finally {
     restore();
   }
@@ -202,7 +202,7 @@ test('a claims read asks for content up to the cap, whole bodies only', async ()
     const head = 'bciqdlnrhbcnkalcqxrpxpmroin6iu5w6dgfjqoemvxlvvhtwepbe6ma';
     const page = await new RestSource(restConnection, '').fetch({
       limit: 10,
-      scope: { name: 'main', head },
+      scope: { name: 'main', head, branch: 'main' },
     });
     assert.equal(page.claims.length, 0);
   } finally {
@@ -272,15 +272,15 @@ test('switching between scopes and back keeps both answers', async () => {
   const source = new MockSource(MOCK_PARAMS);
   const scopes = (await source.branches()).filter((s) => s.name !== ARCHIVE_SCOPE);
 
-  setMembers(scopes[0].name, await source.scopeIds(scopes[0]));
-  setMembers(scopes[1].name, await source.scopeIds(scopes[1]));
+  setMembers(scopes[0].head, await source.scopeIds(scopes[0]));
+  setMembers(scopes[1].head, await source.scopeIds(scopes[1]));
 
-  const first = membersOf(scopes[0].name);
-  const second = membersOf(scopes[1].name);
+  const first = membersOf(scopes[0].head);
+  const second = membersOf(scopes[1].head);
   assert.ok(first && second, 'an answer was dropped on switching');
   assert.notEqual(first.size, 0);
   // Reselecting reads the held answer rather than asking again.
-  assert.equal(membersOf(scopes[0].name), first);
+  assert.equal(membersOf(scopes[0].head), first);
 });
 
 // 5.5 — an unanswered scope admits everything rather than drawing blank.
@@ -311,7 +311,7 @@ test('an ids-only read decodes through the library reader', async () => {
     // A real head: the query codec validates `select.head` as a multibase id before the
     // request leaves, so a stand-in that is not one is refused here rather than by a server.
     const head = 'bciqdlnrhbcnkalcqxrpxpmroin6iu5w6dgfjqoemvxlvvhtwepbe6ma';
-    const ids = await new RestSource(restConnection, '').scopeIds({ name: 'main', head });
+    const ids = await new RestSource(restConnection, '').scopeIds({ name: 'main', head, branch: 'main' });
     // A route arrives flattened into the claims along it, which is the reader's doing.
     assert.deepEqual(ids, ['id-a', 'id-b', 'id-c', 'id-d']);
   } finally {

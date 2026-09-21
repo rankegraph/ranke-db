@@ -183,7 +183,7 @@ func contributor(t *testing.T) (ranke.Keypair, ranke.Claim) {
 	self, err := ranke.NewClaim(ranke.NodeContributor, nil).
 		WithInlineContent(pubkey).
 		WithEncoding(ranke.EncodingOctetStream).
-		WithCreatedAt(time.Unix(0, 0).UTC()).
+		WithCreatedAt(time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)).
 		Sign(priv)
 	if err != nil {
 		t.Fatalf("sign the contributor claim: %v", err)

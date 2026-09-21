@@ -1,4 +1,4 @@
-// package: main / cmd
+// package: generator / cmd
 // type:    entrypoint
 // job:     the generator binary — a client that seeds a running ranke-db over its REST API
 // limits:  a client only: no config, no adapters, no archive of its own (-> cmd/ranke-db serves),

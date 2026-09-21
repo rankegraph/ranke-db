@@ -59,8 +59,9 @@ first. The paper is the user's to write; do not edit it.
 - Storage: **Blob store** (`get/put/has`, content-addressed) → typed **Universe** →
   composed via **Stack** (eager/lazy layers) and **Partition** (sharding). "Layers" = a Stack.
 - A read is a **filtered query**: the closure of a head, narrowed by a *conjunction of
-  filters*, capped by a result limit (conjunctive monotonicity). Out-of-scope refs come back
-  as **hash-only stubs** so the subgraph still Merkle-verifies. (Cypher is NOT in the spec.)
+  filters*, capped by a result limit (conjunctive monotonicity). Claims outside the closure
+  simply **do not appear**; what keeps the returned subgraph Merkle-verifiable is the
+  reference id inside each claim's own envelope bytes. (Cypher is NOT in the spec.)
 - Access is **scope-based**: a base posture (`allow-all`/`deny-all`) + an ordered list of
   wildcard exceptions over field/edge names & types, bound to the authenticated account.
 - **Verification** has three depths: completeness (`has` sweep) / record-correctness

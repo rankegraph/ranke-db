@@ -233,7 +233,7 @@ func TestDevWiresSteerableClock(t *testing.T) {
 	}
 	// A fixture generator's story is typically dated in the past relative to whenever
 	// it's re-run (SteerableClock's own tests pin why that must still land exactly).
-	at := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+	at := time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)
 	if got := app.DevClock.Advance(at); !got.Equal(at) {
 		t.Errorf("Advance(%s) = %s, want the requested instant", at, got)
 	}

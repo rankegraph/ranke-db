@@ -47,12 +47,13 @@ func TestRefusalsFromTheRealEndpoint(t *testing.T) {
 		assertCategory(t, err, client.ErrNotFound, core.CatNotFound)
 	})
 
-	t.Run("invalid", func(t *testing.T) {
+	t.Run("unresolvable_reference", func(t *testing.T) {
 		s, c := serve(t)
 		// The note references a contributor claim that neither the archive holds nor the
-		// stream carries, so the closure cannot resolve the signature over it.
+		// stream carries. That reads as a reference out of reach rather than a malformed
+		// request, and answering so tells the caller nothing about whether it exists.
 		_, err := c.Contribute(ctx, s.Universe, testBranch, []ranke.Claim{s.note(t, "orphaned", storyTime)})
-		assertCategory(t, err, client.ErrInvalid, core.CatInvalid)
+		assertCategory(t, err, client.ErrForbidden, core.CatForbidden)
 	})
 }
 

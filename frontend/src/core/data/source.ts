@@ -8,12 +8,13 @@
  * act: one data path, not a real and a test one.
  */
 
-import { EncodeQuery, newSeqReader, readIds } from '@rankegraph/ranke';
+import { EncodeQuery, decodeClaim, newSeqReader, readIds } from '@rankegraph/ranke';
 import type { Query as RankeQuery } from '@rankegraph/ranke';
 import { contributionUnknown, drawn } from '../claims.ts';
 import type { DrawnClaim } from '../claims.ts';
 import { generate } from '../mock/generate.ts';
 import type { MockArchive } from '../mock/model.ts';
+import { rememberClaimBytes } from '../claimBytes.ts';
 import { ARCHIVE_SCOPE } from '../scope.ts';
 import type { Scope } from '../scope.ts';
 import { apiFor, probe } from '../connections.ts';
@@ -76,6 +77,12 @@ export interface DataSource {
   content(scope: Scope | null, id: string): Promise<Uint8Array>;
   /** claimBytes reads the claim's own signed CBOR — what its id is computed over, not what it declares. */
   claimBytes(scope: Scope | null, id: string): Promise<Uint8Array>;
+  /**
+   * claimAt reads one claim over the claim route, for filling a shortfall — re-reading a whole
+   * closure to collect the few claims a session lacks costs the closure. The bytes are the
+   * claim's own, so the id is checkable against them and the CBOR tab's cache is filled too.
+   */
+  claimAt(scope: Scope, id: string): Promise<DrawnClaim | null>;
 }
 
 /** MockSource generates an archive locally. Its parameters are its server details. */
@@ -108,8 +115,8 @@ export class MockSource implements DataSource {
   async branches(): Promise<Scope[]> {
     const archive = this.wholeArchive();
     return [
-      { name: ARCHIVE_SCOPE, head: archive.head },
-      ...Object.entries(archive.branches).map(([name, head]) => ({ name, head })),
+      { name: ARCHIVE_SCOPE, head: archive.head, branch: ARCHIVE_SCOPE },
+      ...Object.entries(archive.branches).map(([name, head]) => ({ name, head, branch: name })),
     ];
   }
 
@@ -118,7 +125,7 @@ export class MockSource implements DataSource {
    * contributors, the branch table — so it belongs to every scope.
    */
   async scopeIds(scope: Scope): Promise<string[]> {
-    return scopedClaims(this.wholeArchive(), scope.name).map((c) => c.claim.id);
+    return scopedClaims(this.wholeArchive(), scope.branch, scope.head).map((c) => c.claim.id);
   }
 
   /**
@@ -150,6 +157,11 @@ export class MockSource implements DataSource {
     );
   }
 
+  /** claimAt hands back a generated claim, which the archive already holds decoded. */
+  async claimAt(scope: Scope, id: string): Promise<DrawnClaim | null> {
+    return scopedClaims(this.wholeArchive(), scope.branch).find((c) => c.claim.id === id) ?? null;
+  }
+
   /** A generated claim was never encoded as signed CBOR — nothing honest to hand back. */
   async claimBytes(): Promise<Uint8Array> {
     throw new Error(
@@ -165,14 +177,46 @@ export class MockSource implements DataSource {
 }
 
 /**
+ * routeBranch picks which scope's route serves a claim. `branch`, never `name`: a provenance
+ * scope is named for its claim and read within a branch, so the name is no route at all.
+ */
+function routeBranch(scope: Scope | null): string | null {
+  if (scope === null || scope.branch === ARCHIVE_SCOPE) return null;
+  return scope.branch;
+}
+
+/**
  * scopedClaims is the mock's one answer to "what is in this scope", so a read and an id
  * listing cannot disagree. An unstamped claim is shared and belongs to every scope; a name
  * the branch table does not hold is no scope, and contains nothing.
+ *
+ * A head narrows that to its closure, which is what a provenance scope asks for. The walk is
+ * the engine's work against a server; here the mock *is* the archive, so it answers the same
+ * question the server would rather than the explorer inferring it.
  */
-function scopedClaims(archive: MockArchive, scope?: string): DrawnClaim[] {
-  if (!scope || scope === ARCHIVE_SCOPE) return archive.claims;
-  if (!(scope in archive.branches)) return [];
-  return archive.claims.filter((c) => c.branch === scope || c.branch === '');
+function scopedClaims(archive: MockArchive, scope?: string, head?: string): DrawnClaim[] {
+  const within =
+    !scope || scope === ARCHIVE_SCOPE
+      ? archive.claims
+      : scope in archive.branches
+        ? archive.claims.filter((c) => c.branch === scope || c.branch === '')
+        : [];
+  if (!head || head === archive.head || head === archive.branches[scope ?? '']) return within;
+  return closureOf(within, head);
+}
+
+/** closureOf walks references from a head, which terminate: the graph is acyclic and finite. */
+function closureOf(claims: DrawnClaim[], head: string): DrawnClaim[] {
+  const byId = new Map(claims.map((c) => [c.claim.id, c]));
+  const reached = new Set<string>();
+  const pending = [head];
+  while (pending.length > 0) {
+    const id = pending.pop() as string;
+    if (reached.has(id)) continue;
+    reached.add(id);
+    for (const edge of byId.get(id)?.claim.edges ?? []) pending.push(edge.reference);
+  }
+  return claims.filter((c) => reached.has(c.claim.id));
 }
 
 /**
@@ -228,14 +272,16 @@ export class RestSource implements DataSource {
     const listed = await this.answer(() => this.api.branches.listBranches(), 'listing branches');
     const branches = (listed.data.branches ?? [])
       .filter((b) => Boolean(b.name && b.head))
-      .map(({ name, head }) => ({ name, head }));
+      .map(({ name, head }) => ({ name, head, branch: name }));
 
     try {
       const archive = await this.answer(
         () => this.api.archive.getArchiveInfo(),
         'reading the archive',
       );
-      if (archive.data.head) return [{ name: ARCHIVE_SCOPE, head: archive.data.head }, ...branches];
+      if (archive.data.head) {
+        return [{ name: ARCHIVE_SCOPE, head: archive.data.head, branch: ARCHIVE_SCOPE }, ...branches];
+      }
     } catch {
       // Not grantable to this subject, or an older instance: the branches still stand.
     }
@@ -250,7 +296,7 @@ export class RestSource implements DataSource {
   async scopeIds(scope: Scope): Promise<string[]> {
     const response = await this.query(
       {
-        select: { branch: scope.name, head: scope.head },
+        select: { branch: scope.branch, head: scope.head },
         output: { detail: 'id', encoding: 'json' },
       },
       `reading the ids in ${scope.name}`,
@@ -277,7 +323,7 @@ export class RestSource implements DataSource {
     const t0 = performance.now();
     const response = await this.query(
       {
-        select: { branch: request.scope.name, head: request.scope.head },
+        select: { branch: request.scope.branch, head: request.scope.head },
         output: {
           detail: 'claims',
           form: 'original',
@@ -306,7 +352,7 @@ export class RestSource implements DataSource {
    * which scope's route answers, and the client builds the path.
    */
   async content(scope: Scope | null, id: string): Promise<Uint8Array> {
-    const branch = scope === null || scope.name === ARCHIVE_SCOPE ? null : scope.name;
+    const branch = routeBranch(scope);
     const response = await this.answer(
       () =>
         branch === null
@@ -319,7 +365,7 @@ export class RestSource implements DataSource {
 
   /** The claim route, not content's — same scope logic, raw `Response` read directly as bytes. */
   async claimBytes(scope: Scope | null, id: string): Promise<Uint8Array> {
-    const branch = scope === null || scope.name === ARCHIVE_SCOPE ? null : scope.name;
+    const branch = routeBranch(scope);
     const response = await this.answer(
       () =>
         branch === null
@@ -328,6 +374,18 @@ export class RestSource implements DataSource {
       `reading the CBOR of ${id.slice(0, 12)}…`,
     );
     return new Uint8Array(await response.arrayBuffer());
+  }
+
+  /**
+   * claimAt reads the claim route and decodes the bytes. Not an anchored query: an empty
+   * `select.path` answers exactly as an absent one does — the frontier's whole outward closure,
+   * measured against a dev instance — so capping it at one result returns some other claim.
+   */
+  async claimAt(scope: Scope, id: string): Promise<DrawnClaim | null> {
+    const bytes = await this.claimBytes(scope, id);
+    const claim = decodeClaim(bytes, id);
+    rememberClaimBytes(id, bytes);
+    return drawn(claim);
   }
 
   /** headOf reads a branch head — the one moving target in an archive. */

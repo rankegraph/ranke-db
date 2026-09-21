@@ -35,6 +35,9 @@ var (
 	ErrNilClaim = errors.New("ranke/client: nil claim")
 	// ErrNoPubkey is a read narrowed to a key, with no key given.
 	ErrNoPubkey = errors.New("ranke/client: a pubkey is required")
+	// ErrNoLiveContributor is a key with no registration admitting the instant asked
+	// about — none at all, or none whose window still stands.
+	ErrNoLiveContributor = errors.New("ranke/client: no contributor claim admits this key")
 	// ErrUniverseNeedsHead is a closure read asked of `$universe`, which offers no head to
 	// walk from and requires one (`R-QHEAD`); a claim there is reached by id.
 	ErrUniverseNeedsHead = errors.New("ranke/client: a $universe read needs a head")

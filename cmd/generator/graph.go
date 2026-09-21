@@ -1,4 +1,4 @@
-// package: main / cmd
+// package: generator / cmd
 // type:    logic
 // job:     the fixture identity and the graph shapes it signs
 // limits:  builds claims only; delivering them is the client's (-> client.go)
@@ -50,7 +50,7 @@ const identityDomain = "ranke-db/generator/contributor/"
 
 // epoch is the fixture clock's start. Pinned, not time.Now(): an id covers created_at,
 // so a fixed clock makes the same command yield the same ids.
-var epoch = time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+var epoch = time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)
 
 // clockStep advances the fixture clock per claim, so created_at orders the build.
 const clockStep = time.Minute

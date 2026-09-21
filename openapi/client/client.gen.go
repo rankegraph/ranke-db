@@ -311,28 +311,28 @@ type BranchList struct {
 
 // Comparison One operator applied to one field. eq, ne, lt, le, gt and ge take a value, in a set, glob a shell-style wildcard. Exactly one is present.
 type Comparison struct {
-	// Eq A value a comparison tests against. Where it tests a time it MUST be a V-TIME timestamp or an EDTF Level 1 value, and anything else is rejected rather than coerced (R-QTIMEOP); otherwise how two values compare is the engine's.
+	// Eq A value a comparison tests against. On a field V-TIME or V-DATED governs it MUST take that field's own form — a V-TIME timestamp on a V-TIME field, an EDTF Level 1 value on a V-DATED field — and anything else, a glob included, is rejected rather than coerced (R-QTIMEOP); an interval is a pair of bounds. The form binds the value as encoded here, so a binding may take its own language's temporal type provided it renders it into that form. Otherwise how two values compare is the engine's.
 	Eq *Value `json:"eq,omitempty"`
 
-	// Ge A value a comparison tests against. Where it tests a time it MUST be a V-TIME timestamp or an EDTF Level 1 value, and anything else is rejected rather than coerced (R-QTIMEOP); otherwise how two values compare is the engine's.
+	// Ge A value a comparison tests against. On a field V-TIME or V-DATED governs it MUST take that field's own form — a V-TIME timestamp on a V-TIME field, an EDTF Level 1 value on a V-DATED field — and anything else, a glob included, is rejected rather than coerced (R-QTIMEOP); an interval is a pair of bounds. The form binds the value as encoded here, so a binding may take its own language's temporal type provided it renders it into that form. Otherwise how two values compare is the engine's.
 	Ge *Value `json:"ge,omitempty"`
 
 	// Glob Shell-style wildcard.
 	Glob *string `json:"glob,omitempty"`
 
-	// Gt A value a comparison tests against. Where it tests a time it MUST be a V-TIME timestamp or an EDTF Level 1 value, and anything else is rejected rather than coerced (R-QTIMEOP); otherwise how two values compare is the engine's.
+	// Gt A value a comparison tests against. On a field V-TIME or V-DATED governs it MUST take that field's own form — a V-TIME timestamp on a V-TIME field, an EDTF Level 1 value on a V-DATED field — and anything else, a glob included, is rejected rather than coerced (R-QTIMEOP); an interval is a pair of bounds. The form binds the value as encoded here, so a binding may take its own language's temporal type provided it renders it into that form. Otherwise how two values compare is the engine's.
 	Gt *Value `json:"gt,omitempty"`
 
 	// In Set membership.
 	In *[]Value `json:"in,omitempty"`
 
-	// Le A value a comparison tests against. Where it tests a time it MUST be a V-TIME timestamp or an EDTF Level 1 value, and anything else is rejected rather than coerced (R-QTIMEOP); otherwise how two values compare is the engine's.
+	// Le A value a comparison tests against. On a field V-TIME or V-DATED governs it MUST take that field's own form — a V-TIME timestamp on a V-TIME field, an EDTF Level 1 value on a V-DATED field — and anything else, a glob included, is rejected rather than coerced (R-QTIMEOP); an interval is a pair of bounds. The form binds the value as encoded here, so a binding may take its own language's temporal type provided it renders it into that form. Otherwise how two values compare is the engine's.
 	Le *Value `json:"le,omitempty"`
 
-	// Lt A value a comparison tests against. Where it tests a time it MUST be a V-TIME timestamp or an EDTF Level 1 value, and anything else is rejected rather than coerced (R-QTIMEOP); otherwise how two values compare is the engine's.
+	// Lt A value a comparison tests against. On a field V-TIME or V-DATED governs it MUST take that field's own form — a V-TIME timestamp on a V-TIME field, an EDTF Level 1 value on a V-DATED field — and anything else, a glob included, is rejected rather than coerced (R-QTIMEOP); an interval is a pair of bounds. The form binds the value as encoded here, so a binding may take its own language's temporal type provided it renders it into that form. Otherwise how two values compare is the engine's.
 	Lt *Value `json:"lt,omitempty"`
 
-	// Ne A value a comparison tests against. Where it tests a time it MUST be a V-TIME timestamp or an EDTF Level 1 value, and anything else is rejected rather than coerced (R-QTIMEOP); otherwise how two values compare is the engine's.
+	// Ne A value a comparison tests against. On a field V-TIME or V-DATED governs it MUST take that field's own form — a V-TIME timestamp on a V-TIME field, an EDTF Level 1 value on a V-DATED field — and anything else, a glob included, is rejected rather than coerced (R-QTIMEOP); an interval is a pair of bounds. The form binds the value as encoded here, so a binding may take its own language's temporal type provided it renders it into that form. Otherwise how two values compare is the engine's.
 	Ne *Value `json:"ne,omitempty"`
 }
 
@@ -527,14 +527,22 @@ type Select struct {
 	// Branch The mandatory scope, and every scope names a graph: a branch name confines to that branch, $archive to the whole Ranke-Archive, $universe applies no confinement and is privileged. An empty value is refused (R-QSCOPE).
 	Branch string `json:"branch"`
 
-	// Claim A claim id: id(v) = Sign(H(S(v))) for a node, id(e) = H(S(e)) for an edge, carried as multibase base32 of the self-describing payload. The pattern fixes the multibase framing; whether the payload's multihash or multikey framing parses is the implementation's check.
-	Claim *Id `json:"claim,omitempty"`
+	// Claim Anchors the frontier at the claims it names, one id or a set of them, each of which must lie inside the closure. A set names its members in no order and holds each once. Absent, the frontier is every claim in the closure and the path is unanchored (R-QANCHOR). A set anchor with an empty path resolves the height of the claims a new claim references (V-HEIGHT) in one read.
+	Claim *Select_Claim `json:"claim,omitempty"`
 
 	// Head A claim id: id(v) = Sign(H(S(v))) for a node, id(e) = H(S(e)) for an edge, carried as multibase base32 of the self-describing payload. The pattern fixes the multibase framing; whether the payload's multihash or multikey framing parses is the implementation's check.
 	Head *Id `json:"head,omitempty"`
 
-	// Path The traversal: a sequence of steps over frontiers, each frontier a set of claims. Each step's yield is the frontier the next starts from, and the no-repeat rule holds within a step and resets at each boundary, so membership is all a frontier carries (R-QFRONTIER). Absent, the generator returns the full outward closure of the frontier (R-QSTEPS).
+	// Path The traversal: a sequence of steps over frontiers, each frontier a set of claims. Each step's yield is the frontier the next starts from, and the no-repeat rule holds within a step and resets at each boundary, so membership is all a frontier carries (R-QFRONTIER). Empty, the generator takes no step and returns the frontier itself; absent, it returns the frontier's full outward closure (R-QSTEPS).
 	Path *[]PathStep `json:"path,omitempty"`
+}
+
+// SelectClaim1 defines model for Select.Claim.1.
+type SelectClaim1 = []Id
+
+// Select_Claim Anchors the frontier at the claims it names, one id or a set of them, each of which must lie inside the closure. A set names its members in no order and holds each once. Absent, the frontier is every claim in the closure and the path is unanchored (R-QANCHOR). A set anchor with an empty path resolves the height of the claims a new claim references (V-HEIGHT) in one read.
+type Select_Claim struct {
+	union json.RawMessage
 }
 
 // StorageLayer defines model for StorageLayer.
@@ -577,7 +585,7 @@ type Subject struct {
 // TypeGlob A glob over class/sub, e.g. derivation/* or entity/person. A leading - excludes. Exclusion decides: a type matching an excluded pattern is refused whatever the included patterns say, and a list of exclusions alone admits every other type (R-QSTEPS).
 type TypeGlob = string
 
-// Value A value a comparison tests against. Where it tests a time it MUST be a V-TIME timestamp or an EDTF Level 1 value, and anything else is rejected rather than coerced (R-QTIMEOP); otherwise how two values compare is the engine's.
+// Value A value a comparison tests against. On a field V-TIME or V-DATED governs it MUST take that field's own form — a V-TIME timestamp on a V-TIME field, an EDTF Level 1 value on a V-DATED field — and anything else, a glob included, is rejected rather than coerced (R-QTIMEOP); an interval is a pair of bounds. The form binds the value as encoded here, so a binding may take its own language's temporal type provided it renders it into that form. Otherwise how two values compare is the engine's.
 type Value = interface{}
 
 // VerificationConfig Parameters for a verification run — the same shape whether declared in the
@@ -734,6 +742,68 @@ type QueryJSONRequestBody = Query
 
 // StartVerificationJSONRequestBody defines body for StartVerification for application/json ContentType.
 type StartVerificationJSONRequestBody = VerificationConfig
+
+// AsId returns the union data inside the Select_Claim as a Id
+func (t Select_Claim) AsId() (Id, error) {
+	var body Id
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromId overwrites any union data inside the Select_Claim as the provided Id
+func (t *Select_Claim) FromId(v Id) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeId performs a merge with any union data inside the Select_Claim, using the provided Id
+func (t *Select_Claim) MergeId(v Id) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSelectClaim1 returns the union data inside the Select_Claim as a SelectClaim1
+func (t Select_Claim) AsSelectClaim1() (SelectClaim1, error) {
+	var body SelectClaim1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSelectClaim1 overwrites any union data inside the Select_Claim as the provided SelectClaim1
+func (t *Select_Claim) FromSelectClaim1(v SelectClaim1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSelectClaim1 performs a merge with any union data inside the Select_Claim, using the provided SelectClaim1
+func (t *Select_Claim) MergeSelectClaim1(v SelectClaim1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t Select_Claim) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *Select_Claim) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
 
 // AsWhere0 returns the union data inside the Where as a Where0
 func (t Where) AsWhere0() (Where0, error) {

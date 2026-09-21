@@ -86,6 +86,11 @@ this view asserts.
 - **`frontend/src/core/graph/universe.ts`**: an incremental merge the session can call
   outside `load`.
 - **`frontend/src/ui/panes/SelectionPane.tsx`**: the `show claim provenance` action.
+- **`frontend/src/ui/shell/Header.tsx`**: the scope picker stops retargeting a view it does not
+  govern. `selectScope` patches the active view unconditionally (`session.ts:253`), so a branch
+  chosen while a provenance view is active silently converts it — and `scopeOptions` builds
+  from the discovered branches alone, which a provenance scope is never among, so the picker
+  has no entry describing such a view either.
 - **`frontend/src/ui/shell/App.tsx`**: nothing, if the tab is a view — which is the point of
   drawing it as one.
 - **Not affected**: the server, the contract, `ranke-go`. Every read this change makes is one

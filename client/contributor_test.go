@@ -8,6 +8,7 @@ package client_test
 import (
 	"bytes"
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -172,7 +173,7 @@ func expiryAgainst(t *testing.T, by ranke.Keypair, target ranke.Id, at time.Time
 		t.Fatalf("NewContributor: %v", err)
 	}
 	claim, err := ranke.NewClaim(expiryType, self).
-		WithCreatedAt(time.Unix(0, 0).UTC()).
+		WithCreatedAt(time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)).
 		WithHeight(1).
 		WithEdges(edge).
 		Sign()
@@ -339,5 +340,75 @@ func TestABranchListsOnlyItsOwnContributors(t *testing.T) {
 		if len(all) != 1 {
 			t.Errorf("the archive holds %d claims for %q's key, want 1", len(all), branch)
 		}
+	}
+}
+
+// TestContributorForPicksTheLiveRegistration: the common case is one registration, and this
+// is the read an application makes before it signs — the key it holds, resolved to the claim
+// its claims will attribute to.
+func TestContributorForPicksTheLiveRegistration(t *testing.T) {
+	ctx := context.Background()
+	s, c := serve(t)
+	s.seed(t, c, s.note(t, "contributed", storyTime))
+
+	held, err := c.ContributorsFor(ctx, client.ScopeArchive, s.Contributor.Pubkey)
+	if err != nil {
+		t.Fatalf("ContributorsFor: %v", err)
+	}
+	live, err := c.ContributorFor(ctx, client.ScopeArchive, s.Contributor.Pubkey, storyTime)
+	if err != nil {
+		t.Fatalf("ContributorFor: %v", err)
+	}
+	if live.ID().String() != held[0].ID().String() {
+		t.Errorf("ContributorFor = %s, want the registration the key holds %s",
+			live.ID(), held[0].ID())
+	}
+}
+
+// TestContributorForTakesTheFirstOfSeveral: a key may be registered more than once — a
+// second claim beside the first is how a registration whose window was set wrong is
+// corrected — and the basic resolution takes the earliest that admits the instant. A caller
+// wanting another (the latest, the longest-lived) reads the registrations and picks.
+func TestContributorForTakesTheFirstOfSeveral(t *testing.T) {
+	ctx := context.Background()
+	s, c := serve(t)
+	s.seed(t, c, s.note(t, "contributed", storyTime))
+
+	again, err := ranke.NewClaim(ranke.NodeContributor, s.asContributor(t)).
+		WithInlineContent(s.Contributor.Pubkey).
+		WithEncoding(ranke.EncodingOctetStream).
+		WithCreatedAt(storyTime.Add(time.Hour)).
+		WithHeight(1).
+		Sign()
+	if err != nil {
+		t.Fatalf("register the key a second time: %v", err)
+	}
+	s.seed(t, c, again)
+
+	held, err := c.ContributorsFor(ctx, client.ScopeArchive, s.Contributor.Pubkey)
+	if err != nil {
+		t.Fatalf("ContributorsFor: %v", err)
+	}
+	if len(held) != 2 {
+		t.Fatalf("the key holds %d registrations, want 2", len(held))
+	}
+	live, err := c.ContributorFor(ctx, client.ScopeArchive, s.Contributor.Pubkey, storyTime.Add(2*time.Hour))
+	if err != nil {
+		t.Fatalf("ContributorFor: %v", err)
+	}
+	if live.ID().String() != held[0].ID().String() {
+		t.Errorf("ContributorFor = %s, want the first registration %s", live.ID(), held[0].ID())
+	}
+}
+
+// TestContributorForSaysWhenAKeyIsUnknown: a key the scope never admitted is the same
+// refusal, so a caller registers rather than guessing at a claim that is not there.
+func TestContributorForSaysWhenAKeyIsUnknown(t *testing.T) {
+	ctx := context.Background()
+	_, c := serve(t)
+
+	_, err := c.ContributorFor(ctx, client.ScopeArchive, newKeypair(t).Pubkey, storyTime)
+	if !errors.Is(err, client.ErrNoLiveContributor) {
+		t.Errorf("ContributorFor for an unknown key: %v, want ErrNoLiveContributor", err)
 	}
 }

@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 
 import { MockSource, RestSource } from './source.ts';
 import type { DataSource } from './source.ts';
-import { ARCHIVE_SCOPE } from '../scope.ts';
+import { ARCHIVE_SCOPE, provenanceScope } from '../scope.ts';
 import type { Connection } from '../connections.ts';
 
 const MOCK_PARAMS = { claims: 50, seed: 1, claimsPerContribution: 10 };
@@ -52,10 +52,10 @@ test('claimBytes reads the branch route for a named scope and the archive route 
   try {
     const rest: DataSource = new RestSource(restConnection, '');
 
-    const fromBranch = await rest.claimBytes({ name: 'main', head: 'h' }, 'claim-1');
+    const fromBranch = await rest.claimBytes({ name: 'main', head: 'h', branch: 'main' }, 'claim-1');
     assert.deepEqual([...fromBranch], [...bytes]);
 
-    const fromArchive = await rest.claimBytes({ name: ARCHIVE_SCOPE, head: 'h' }, 'claim-1');
+    const fromArchive = await rest.claimBytes({ name: ARCHIVE_SCOPE, head: 'h', branch: ARCHIVE_SCOPE }, 'claim-1');
     assert.deepEqual([...fromArchive], [...bytes]);
 
     const fromNull = await rest.claimBytes(null, 'claim-1');
@@ -68,6 +68,23 @@ test('claimBytes reads the branch route for a named scope and the archive route 
     '/archive/claims/claim-1',
     '/archive/claims/claim-1',
   ]);
+});
+
+// The route comes from the branch a scope is read within, never its name: a provenance scope
+// is named for its claim, so a name-derived route asks for a branch no archive holds — and the
+// by-id fill that calls this swallows the 404 as an ordinary unreadable claim.
+test('a provenance scope reads the route of the branch it is read within', async () => {
+  const bytes = new Uint8Array([9, 9]);
+  const asked: string[] = [];
+  const restore = stubBytes(bytes, asked);
+  try {
+    const rest: DataSource = new RestSource(restConnection, '');
+    await rest.claimBytes(provenanceScope('claim-xyz', 'main'), 'claim-1');
+    await rest.claimBytes(provenanceScope('claim-xyz', ARCHIVE_SCOPE), 'claim-1');
+  } finally {
+    restore();
+  }
+  assert.deepEqual(asked, ['/branches/main/claims/claim-1', '/archive/claims/claim-1']);
 });
 
 // A generated claim is a record this generator built in memory, never signed CBOR — there
