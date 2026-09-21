@@ -7,6 +7,9 @@ import (
 	"crypto/ed25519"
 	"crypto/sha256"
 	"testing"
+	"time"
+
+	"github.com/rankegraph/ranke-go"
 
 	"github.com/rankegraph/ranke-db/adapters/signer/azure/azuretest"
 	"github.com/rankegraph/ranke-db/adapters/signer/inmemory/inmemorytest"
@@ -87,6 +90,37 @@ func conform(t *testing.T, s testSigner) {
 		t.Fatal("corrupted signature verified")
 	}
 	t.Log("▸ corrupted signature is rejected")
+
+	foundsAnIdentity(t, s)
+}
+
+// foundsAnIdentity is the other half of the contract: the port serves as a claim's signing
+// key, so an identity can be founded on it — which is how a client signs as a key it never
+// holds (-> cmd/ranke-client/contributor.Load) and how the Sequencer signs as its own.
+func foundsAnIdentity(t *testing.T, s testSigner) {
+	t.Helper()
+	ctx := context.Background()
+
+	private, err := CryptoSigner(ctx, s)
+	if err != nil {
+		t.Fatalf("CryptoSigner: %v", err)
+	}
+	pubkey, err := ranke.EncodePublicKey(private.Public())
+	if err != nil {
+		t.Fatalf("EncodePublicKey: %v", err)
+	}
+	claim, err := ranke.NewClaim(ranke.NodeContributor, nil).
+		WithInlineContent(pubkey).
+		WithEncoding(ranke.EncodingOctetStream).
+		WithCreatedAt(time.Now().UTC()).
+		Sign(private)
+	if err != nil {
+		t.Fatalf("sign a contributor claim: %v", err)
+	}
+	if _, err := claim.AsContributor(ctx, ranke.NewMemoryUniverse(), private); err != nil {
+		t.Fatalf("AsContributor: %v", err)
+	}
+	t.Logf("▸ founds a contributor identity: %s", claim.ID())
 }
 
 // verifier is the check for the scheme pub is a key of: raw Ed25519, or ECDSA over

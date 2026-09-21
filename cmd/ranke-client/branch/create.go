@@ -47,7 +47,7 @@ func createCmd(inst *instance.Instance) *cobra.Command {
 			if err := ranke.ValidateBranchName(name); err != nil {
 				return err
 			}
-			pair, err := contributor.Load(keySpec, cmd.InOrStdin())
+			pair, err := contributor.Load(cmd.Context(), keySpec, cmd.InOrStdin())
 			if err != nil {
 				return err
 			}
@@ -71,7 +71,8 @@ func createCmd(inst *instance.Instance) *cobra.Command {
 		},
 	}
 	c.Flags().StringVar(&keySpec, "signing-key", "",
-		"the contributor key to sign as: a path, file:path, env:VAR, stdin, or prompt")
+		"the contributor key to sign as: a path, file:path, env:VAR, stdin, prompt,\n"+
+			"or azure:https://VAULT/keys/NAME to sign in the vault, holding no key here")
 	return c
 }
 

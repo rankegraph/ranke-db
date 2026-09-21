@@ -9,9 +9,7 @@ package sequencer
 
 import (
 	"context"
-	"crypto"
 	"fmt"
-	"io"
 	"time"
 
 	"github.com/rankegraph/ranke-go"
@@ -22,9 +20,8 @@ import (
 	"github.com/rankegraph/ranke-db/config/scope"
 )
 
-// Sequencer is the sequencer port's product: ranke-go's Sequencer contract. The
-// server reaches the archive through it — immutable snapshots to read from, and
-// merges that advance the head to write.
+// Sequencer is the sequencer port's product: ranke-go's Sequencer contract — immutable
+// snapshots to read from, and merges that advance the head to write.
 type Sequencer = ranke.Sequencer
 
 // New builds the backend named by the section's "type". now is the time source claims are
@@ -65,10 +62,9 @@ func New(ctx context.Context, cfg scope.Section, storage ranke.Universe, sig sig
 	}
 }
 
-// bookmarkList names the list in 𝒰_hist this instance advances. The two keys carry
-// different contracts, so exactly one may be given: "seed" names a list from index 0,
-// "bookmark" reopens one from a surviving entry whose record yields the seed (foundation
-// paper §Backup). Any non-empty seed serves — it is a name, and `V-BMENV` says SHOULD.
+// bookmarkList names the list in 𝒰_hist this instance advances, and exactly one key may:
+// "seed" starts one at index 0, "bookmark" reopens a pruned one from a surviving entry
+// (foundation paper §Backup). Any non-empty seed serves, `V-BMENV` saying SHOULD.
 func bookmarkList(ctx context.Context, cfg scope.Section) (ranke.BookmarkLocator, error) {
 	hasSeed, hasBookmark := cfg.HasValue("seed"), cfg.HasValue("bookmark")
 	switch {
@@ -98,19 +94,17 @@ func bookmarkList(ctx context.Context, cfg scope.Section) (ranke.BookmarkLocator
 	}
 }
 
-// contributor builds the identity merges are signed as, dated when it is made: at boot,
-// off the same clock the merges take, so it precedes every merge it will ever sign
-// (`V-MONO`) and states a time a claim was actually added rather than a constant.
+// contributor builds the identity merges are signed as, dated off the clock the merges
+// take, so it precedes every merge it signs (`V-MONO`) and states a real instant.
 func contributor(ctx context.Context, u ranke.Universe, sig signer.Signer, at time.Time) (ranke.Contributor, error) {
-	pub, err := sig.Public(ctx)
+	key, err := signer.CryptoSigner(ctx, sig)
 	if err != nil {
-		return nil, fmt.Errorf("sequencer: signer public key: %w", err)
+		return nil, fmt.Errorf("sequencer: %w", err)
 	}
-	encoded, err := ranke.EncodePublicKey(pub)
+	encoded, err := ranke.EncodePublicKey(key.Public())
 	if err != nil {
 		return nil, fmt.Errorf("sequencer: encode public key: %w", err)
 	}
-	key := portKey{ctx: ctx, sig: sig, pub: pub}
 	claim, err := ranke.NewClaim(ranke.NodeContributor, nil).
 		WithInlineContent(encoded).
 		WithEncoding(ranke.EncodingOctetStream).
@@ -120,22 +114,6 @@ func contributor(ctx context.Context, u ranke.Universe, sig signer.Signer, at ti
 		return nil, fmt.Errorf("sequencer: sign contributor claim: %w", err)
 	}
 	return claim.AsContributor(ctx, u, key)
-}
-
-// portKey adapts the signer port to crypto.Signer, keeping signing a call: a Transit key
-// never leaves the vault. It carries a context because crypto.Signer takes none.
-type portKey struct {
-	ctx context.Context
-	sig signer.Signer
-	pub crypto.PublicKey
-}
-
-// Public returns the public half of the identity.
-func (k portKey) Public() crypto.PublicKey { return k.pub }
-
-// Sign signs the digest through the port; the backends hold their own entropy.
-func (k portKey) Sign(_ io.Reader, digest []byte, _ crypto.SignerOpts) ([]byte, error) {
-	return k.sig.Sign(k.ctx, digest)
 }
 
 // clockFunc adapts a bare function to dev.Clock/concurrent.Clock — identically shaped
