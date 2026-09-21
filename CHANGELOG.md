@@ -4,6 +4,8 @@ What each release changed for someone depending on this repository.
 
 ## Unreleased
 
+## v1.30.0 — 2026-09-21
+
 ### Added
 
 - `ranke-client --signing-key` takes `azure:https://VAULT/keys/NAME` beside the spellings
