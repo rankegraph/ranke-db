@@ -67,6 +67,17 @@ depth the deployment wants.
   such as MinIO.
 ]
 
+#item("azure")[
+  `container`, required — the blob container claims and content are kept in,
+  which must already exist. Three ways to reach it, in the order they are read:
+  `connectionString` alone, which is what an emulator is given; `accountName`
+  and `accountKey` over `url`, the blob service URL; or `url` by itself, where
+  the ambient identity answers — a managed identity, the `AZURE_*` variables, a
+  signed-in `az`. `concurrency` sizes the bulk fan-out, and `readOnly`
+  (`"true"`) suppresses the capability probe's test write, for a container the
+  deployment may only read.
+]
+
 #item("redis")[
   `addr` (`host:port`), with optional `password` and `db`, the numeric database
   index.

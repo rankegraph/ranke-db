@@ -16,6 +16,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
@@ -23,6 +25,7 @@ import (
 	goredis "github.com/redis/go-redis/v9"
 
 	"github.com/rankegraph/ranke-go"
+	storageazure "github.com/rankegraph/ranke-go/adapter/storage/azure"
 	"github.com/rankegraph/ranke-go/adapter/storage/fs"
 	"github.com/rankegraph/ranke-go/adapter/storage/mem"
 	"github.com/rankegraph/ranke-go/adapter/storage/minimal"
@@ -127,6 +130,8 @@ func build(ctx context.Context, sec scope.Section) (ranke.Universe, error) {
 		return minimal.New(), nil
 	case "s3":
 		return buildS3(ctx, sec)
+	case "azure":
+		return buildAzure(ctx, sec)
 	case "redis":
 		return buildRedis(ctx, sec)
 	case "neo4j":
@@ -277,6 +282,89 @@ func buildS3(ctx context.Context, sec scope.Section) (ranke.Universe, error) {
 		o.UsePathStyle = pathStyle
 	})
 	return storages3.New(client, bucket)
+}
+
+// buildAzure builds an Azure Blob Storage Universe over one container, the object-store
+// leaf beside s3. "readOnly" spares an immutable container the probe's sentinel write.
+func buildAzure(ctx context.Context, sec scope.Section) (ranke.Universe, error) {
+	name, err := sec.Get(ctx, "container")
+	if err != nil {
+		return nil, fmt.Errorf("storage: azure: %w", err)
+	}
+	client, err := blobClient(ctx, sec)
+	if err != nil {
+		return nil, err
+	}
+	var opts []storageazure.Option
+	if sec.HasValue("concurrency") {
+		raw, err := sec.Get(ctx, "concurrency")
+		if err != nil {
+			return nil, fmt.Errorf("storage: azure: concurrency: %w", err)
+		}
+		n, err := strconv.Atoi(raw)
+		if err != nil || n < 1 {
+			return nil, fmt.Errorf("storage: azure: concurrency %q: want a positive whole number", raw)
+		}
+		opts = append(opts, storageazure.WithConcurrency(n))
+	}
+	if sec.HasValue("readOnly") {
+		raw, err := sec.Get(ctx, "readOnly")
+		if err != nil {
+			return nil, fmt.Errorf("storage: azure: readOnly: %w", err)
+		}
+		if raw == "true" {
+			opts = append(opts, storageazure.ReadOnly())
+		}
+	}
+	return storageazure.New(client, name, opts...)
+}
+
+// blobClient reads the three credential forms in order: "connectionString", a shared key
+// over "url", then the ambient identity over "url".
+func blobClient(ctx context.Context, sec scope.Section) (*azblob.Client, error) {
+	if sec.HasValue("connectionString") {
+		conn, err := sec.Get(ctx, "connectionString")
+		if err != nil {
+			return nil, fmt.Errorf("storage: azure: connectionString: %w", err)
+		}
+		client, err := azblob.NewClientFromConnectionString(conn, nil)
+		if err != nil {
+			return nil, fmt.Errorf("storage: azure: %w", err)
+		}
+		return client, nil
+	}
+	url, err := sec.Get(ctx, "url")
+	if err != nil {
+		return nil, fmt.Errorf("storage: azure: url: %w (the blob service URL, or give a connectionString)", err)
+	}
+	if sec.HasValue("accountKey") {
+		account, err := sec.Get(ctx, "accountName")
+		if err != nil {
+			return nil, fmt.Errorf("storage: azure: accountName: %w (required beside accountKey)", err)
+		}
+		key, err := sec.Get(ctx, "accountKey")
+		if err != nil {
+			return nil, fmt.Errorf("storage: azure: accountKey: %w", err)
+		}
+		cred, err := azblob.NewSharedKeyCredential(account, key)
+		if err != nil {
+			return nil, fmt.Errorf("storage: azure: shared key: %w", err)
+		}
+		client, err := azblob.NewClientWithSharedKeyCredential(url, cred, nil)
+		if err != nil {
+			return nil, fmt.Errorf("storage: azure: %w", err)
+		}
+		return client, nil
+	}
+	cred, err := azidentity.NewDefaultAzureCredential(nil)
+	if err != nil {
+		return nil, fmt.Errorf("storage: azure: default credential: %w", err)
+	}
+	client, err := azblob.NewClient(url, cred, nil)
+	if err != nil {
+		return nil, fmt.Errorf("storage: azure: %w", err)
+	}
+	return client, nil
 }
 
 // buildNeo4j builds a graph-native cache Universe over a neo4j driver: uri is
