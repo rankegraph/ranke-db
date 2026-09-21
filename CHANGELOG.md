@@ -4,6 +4,21 @@ What each release changed for someone depending on this repository.
 
 ## Unreleased
 
+## v1.29.0 — 2026-09-21
+
+### Added
+
+- A `storage` leaf `azure`, Azure Blob Storage as the object store beside `s3`: `container`
+  names the container, which must already exist, and the client comes from
+  `connectionString`, from `accountName` and `accountKey` over `url`, or — naming neither —
+  from the ambient identity over `url`, which is how a managed identity serves. `concurrency`
+  sizes the bulk fan-out and `readOnly` suppresses the capability probe's test write, for a
+  container a deployment may only read. The store is ranke-go's `adapter/storage/azure`; this
+  is the configuration that reaches it, which no `storage` section could until now. It adds
+  `github.com/Azure/azure-sdk-for-go/sdk/storage/azblob` v1.8.1 as a direct dependency, which
+  carries `apache/arrow-go` and its own transitives behind it.
+
+
 ## v1.28.0 — 2026-09-21
 
 ### Added
