@@ -62,6 +62,14 @@ What each release changed for someone depending on this repository.
 
 ### Changed
 
+- The REST contract takes ranke-graph's current RQL schema, so a query may anchor at a set of
+  claims — `select.claim` accepts an array of ids beside a single one, each named once and in
+  no order (`R-QANCHOR`) — which is the read that resolves the heights of a new claim's
+  references (`V-HEIGHT`) in one call. `select.path` now distinguishes empty from absent:
+  `[]` takes no step and returns the frontier itself, where omitting it returns that
+  frontier's full outward closure (`R-QSTEPS`). A client sending `"path": []` and meaning
+  "everything" now gets the anchors alone. The vendored `openapi/rql.schema.json` and every
+  generated artifact move with it, the explorer's committed client included.
 - ranke-go moves to v0.35.0, which refuses a claim dated before 2026-05-03 — the day the
   design it conforms to was founded, so no earlier timestamp states a time a claim was
   added. Nothing here dates a claim by a constant any more: the server's signing identity

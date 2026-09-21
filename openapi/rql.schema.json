@@ -39,12 +39,15 @@
           "description": "The closure read: the query sees the intersection of the scope's graph and closure(head), so a head narrows a query. Required under $universe, which confines nothing and so offers no head to fall back on, and may name any claim the Universe holds there; optional under every other scope, where the scope's own head serves (R-QHEAD)."
         },
         "claim": {
-          "$ref": "#/$defs/Id",
-          "description": "Anchors the frontier at the single claim it names, which must lie inside the closure. Absent, the frontier is every claim in the closure and the path is unanchored (R-QANCHOR)."
+          "oneOf": [
+            { "$ref": "#/$defs/Id" },
+            { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/Id" } }
+          ],
+          "description": "Anchors the frontier at the claims it names, one id or a set of them, each of which must lie inside the closure. A set names its members in no order and holds each once. Absent, the frontier is every claim in the closure and the path is unanchored (R-QANCHOR). A set anchor with an empty path resolves the height of the claims a new claim references (V-HEIGHT) in one read."
         },
         "path": {
           "type": "array",
-          "description": "The traversal: a sequence of steps over frontiers, each frontier a set of claims. Each step's yield is the frontier the next starts from, and the no-repeat rule holds within a step and resets at each boundary, so membership is all a frontier carries (R-QFRONTIER). Absent, the generator returns the full outward closure of the frontier (R-QSTEPS).",
+          "description": "The traversal: a sequence of steps over frontiers, each frontier a set of claims. Each step's yield is the frontier the next starts from, and the no-repeat rule holds within a step and resets at each boundary, so membership is all a frontier carries (R-QFRONTIER). Empty, the generator takes no step and returns the frontier itself; absent, it returns the frontier's full outward closure (R-QSTEPS).",
           "items": { "$ref": "#/$defs/PathStep" }
         }
       },
@@ -304,7 +307,7 @@
     },
 
     "Value": {
-      "description": "A value a comparison tests against. Where it tests a time it MUST be a V-TIME timestamp or an EDTF Level 1 value, and anything else is rejected rather than coerced (R-QTIMEOP); otherwise how two values compare is the engine's."
+      "description": "A value a comparison tests against. On a field V-TIME or V-DATED governs it MUST take that field's own form — a V-TIME timestamp on a V-TIME field, an EDTF Level 1 value on a V-DATED field — and anything else, a glob included, is rejected rather than coerced (R-QTIMEOP); an interval is a pair of bounds. The form binds the value as encoded here, so a binding may take its own language's temporal type provided it renders it into that form. Otherwise how two values compare is the engine's."
     }
   },
 
@@ -337,6 +340,17 @@
       },
       "output": { "shape": "path", "detail": "claims" },
       "order": [{ "field": "height", "compare": "numeric", "dir": "desc" }]
+    },
+    {
+      "select": {
+        "branch": "project_x",
+        "claim": [
+          "b5uazx2ehcgywsboft2k52zg7oqep4dre4h4hkmdnc5d2ztw5vqiizhcclmfjkag5pjvp73sbwdzrq527chphuojvxsk7k4e4sfnze6loaq",
+          "b5uazx2ehcgywsboft2k52zg7oqep4dre4h4hkmdnc5d2ztw5vqiizhcclmfjkag5pjvp73sbwdzrq527chphuojvxsk7k4e4sfnze6lobq"
+        ],
+        "path": []
+      },
+      "output": { "detail": "claims" }
     }
   ]
 }
