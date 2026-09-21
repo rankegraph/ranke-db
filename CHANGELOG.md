@@ -4,6 +4,8 @@ What each release changed for someone depending on this repository.
 
 ## Unreleased
 
+## v1.28.0 — 2026-09-21
+
 ### Added
 
 - `client.ContributorFor(ctx, scope, pubkey, at)` — the registration a key signs under at an
